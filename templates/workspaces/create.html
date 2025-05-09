@@ -15,7 +15,7 @@
 <div class="card">
     <div class="card-body">
         <div id="conda-status" class="mb-3"></div>
-
+        
         <form id="create-workspace-form">
             <div class="mb-3">
                 <label for="workspace-name" class="form-label">Workspace Name</label>
@@ -24,7 +24,7 @@
                     This will be used for the directory name and GitLab repository.
                 </div>
             </div>
-
+            
             <div class="mb-3">
                 <label for="env-type" class="form-label">Environment Type</label>
                 <select class="form-select" id="env-type" name="env_type">
@@ -35,7 +35,7 @@
                     Select an environment template for your research domain.
                 </div>
             </div>
-
+            
             <div class="mb-3">
                 <label for="python-env" class="form-label">Use Existing Python Environment</label>
                 <select class="form-select" id="python-env" name="python_env">
@@ -46,7 +46,7 @@
                     Optionally select an existing Python environment to use instead of creating a new one.
                 </div>
             </div>
-
+            
             <div class="mb-3">
                 <label for="git-visibility" class="form-label">GitLab Repository Visibility</label>
                 <select class="form-select" id="git-visibility" name="git_visibility">
@@ -55,7 +55,7 @@
                     <option value="public">Public</option>
                 </select>
             </div>
-
+            
             <div class="mb-3 form-check" id="skip-conda-container" style="display: none;">
                 <input type="checkbox" class="form-check-input" id="skip-conda" name="skip_conda">
                 <label class="form-check-label" for="skip-conda">Skip Conda environment creation</label>
@@ -63,7 +63,7 @@
                     Check this if you want to create the workspace without a Conda environment.
                 </div>
             </div>
-
+            
             <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                 <a href="{{ url_for('workspaces.list_workspaces') }}" class="btn btn-outline-secondary">
                     Cancel
@@ -73,7 +73,7 @@
                 </button>
             </div>
         </form>
-
+        
         <div id="create-status" class="mt-3"></div>
     </div>
 </div>
@@ -88,7 +88,7 @@
             .then(data => {
                 const statusDiv = document.getElementById('conda-status');
                 const skipCondaContainer = document.getElementById('skip-conda-container');
-
+                
                 if (data.available) {
                     statusDiv.innerHTML = `
                         <div class="alert alert-success">
@@ -106,7 +106,7 @@
                             </p>
                         </div>
                     `;
-
+                    
                     // Show the skip conda checkbox and check it by default
                     skipCondaContainer.style.display = 'block';
                     document.getElementById('skip-conda').checked = true;
@@ -121,37 +121,37 @@
                     </div>
                 `;
             });
-
+        
         // Get template from URL if provided
         const urlParams = new URLSearchParams(window.location.search);
         const templateParam = urlParams.get('template');
-
+        
         // Load environment templates
         fetch('/env-templates')
             .then(response => response.json())
             .then(data => {
                 const select = document.getElementById('env-type');
-
+                
                 data.templates.forEach(template => {
                     const option = document.createElement('option');
                     option.value = template;
                     option.textContent = template;
-
+                    
                     // Select the template if it matches the URL parameter
                     if (templateParam && template === templateParam) {
                         option.selected = true;
                     }
-
+                    
                     select.appendChild(option);
                 });
             });
-
+        
         // Load existing Python environments
         fetch('/workspaces/python-environments')
             .then(response => response.json())
             .then(data => {
                 const select = document.getElementById('python-env');
-
+                
                 if (data.environments && data.environments.length > 0) {
                     data.environments.forEach(env => {
                         const option = document.createElement('option');
@@ -160,7 +160,7 @@
                             name: env.name,
                             type: env.type
                         });
-
+                        
                         let label = `${env.name} (${env.version})`;
                         if (env.type === 'conda') {
                             label = `Conda: ${label}`;
@@ -169,11 +169,11 @@
                         } else if (env.type === 'system') {
                             label = `System: ${label}`;
                         }
-
+                        
                         if (env.status === 'active') {
                             label += ' (active)';
                         }
-
+                        
                         option.textContent = label;
                         select.appendChild(option);
                     });
@@ -194,11 +194,11 @@
                 option.disabled = true;
                 select.appendChild(option);
             });
-
+        
         // Handle environment type and Python environment selection
         const envTypeSelect = document.getElementById('env-type');
         const pythonEnvSelect = document.getElementById('python-env');
-
+        
         envTypeSelect.addEventListener('change', function() {
             if (pythonEnvSelect.value) {
                 // If an existing environment is selected, show a warning
@@ -212,7 +212,7 @@
                 }
             }
         });
-
+        
         pythonEnvSelect.addEventListener('change', function() {
             const warningDiv = document.getElementById('env-warning');
             if (this.value && envTypeSelect.value !== 'custom') {
@@ -228,27 +228,27 @@
                 warningDiv.remove();
             }
         });
-
+        
         // Handle form submission
         const form = document.getElementById('create-workspace-form');
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-
+            
             const createButton = document.getElementById('create-button');
             const statusDiv = document.getElementById('create-status');
-
+            
             createButton.disabled = true;
             createButton.innerHTML = `
                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                 Creating...
             `;
-
+            
             statusDiv.innerHTML = `
                 <div class="alert alert-info">
                     Creating workspace... This may take a minute.
                 </div>
             `;
-
+            
             // Parse the Python environment selection if it exists
             let pythonEnv = null;
             const pythonEnvValue = document.getElementById('python-env').value;
@@ -259,7 +259,7 @@
                     console.error('Error parsing Python environment:', e);
                 }
             }
-
+            
             const formData = {
                 name: document.getElementById('workspace-name').value,
                 env_type: document.getElementById('env-type').value,
@@ -267,7 +267,7 @@
                 skip_conda: document.getElementById('skip-conda').checked,
                 python_env: pythonEnv
             };
-
+            
             fetch('/workspaces/create', {
                 method: 'POST',
                 headers: {
@@ -279,7 +279,7 @@
             .then(data => {
                 createButton.disabled = false;
                 createButton.innerHTML = 'Create Workspace';
-
+                
                 if (data.success) {
                     let successMessage = `
                         <div class="alert alert-success">
@@ -289,7 +289,7 @@
                             </a>
                         </div>
                     `;
-
+                    
                     // Add warning if there is one
                     if (data.warning) {
                         successMessage += `
@@ -298,12 +298,12 @@
                             </div>
                         `;
                     }
-
+                    
                     statusDiv.innerHTML = successMessage;
-
+                    
                     // Reset form
                     form.reset();
-
+                    
                     // Redirect after a short delay
                     setTimeout(() => {
                         window.location.href = `/workspaces/${data.workspace.id}`;
@@ -311,14 +311,14 @@
                 } else {
                     let errorMessage = data.message;
                     let errorDetails = data.details ? `<div class="mt-2 small">${data.details}</div>` : '';
-
+                    
                     statusDiv.innerHTML = `
                         <div class="alert alert-danger">
                             ${errorMessage}
                             ${errorDetails}
                         </div>
                     `;
-
+                    
                     // If it's a GitLab error, add a link to check GitLab settings
                     if (errorMessage.includes('GitLab')) {
                         statusDiv.innerHTML += `

@@ -6,12 +6,11 @@ from utils.encryption import decrypt_data
 from extensions import db
 import logging
 
-
 class GitLabService:
     def __init__(self):
         self._api_url = None
         self._headers = None
-
+    
     @property
     def api_url(self):
         if self._api_url is None:
@@ -29,20 +28,20 @@ class GitLabService:
             else:
                 self._api_url = current_app.config['GITLAB_API_URL']
         return self._api_url
-
+    
     @property
     def headers(self):
         if self._headers is None:
             self._headers = self._get_headers()
         return self._headers
-
+    
     def _get_headers(self):
         """Get the headers for GitLab API requests."""
         settings = Settings.query.first()
         if not settings or not settings.gitlab_pat_encrypted:
             logging.warning("GitLab PAT not configured")
             return {}
-
+        
         try:
             token = decrypt_data(settings.gitlab_pat_encrypted, settings.encryption_key)
             return {
@@ -52,7 +51,7 @@ class GitLabService:
         except Exception as e:
             logging.error(f"Error decrypting GitLab PAT: {str(e)}")
             return {}
-
+    
     def validate_token(self, token, api_url=None):
         """Validate a GitLab Personal Access Token."""
         headers = {
@@ -66,7 +65,7 @@ class GitLabService:
         except Exception as e:
             logging.error(f"Error validating GitLab token: {str(e)}")
             return False
-
+    
     def create_repository(self, name, visibility='private'):
         """Create a new GitLab repository."""
         data = {
@@ -74,12 +73,12 @@ class GitLabService:
             'visibility': visibility,
             'initialize_with_readme': True
         }
-
+        
         # Check if headers contain a token
         if 'PRIVATE-TOKEN' not in self.headers:
             logging.error("Cannot create GitLab repository: No PAT configured")
             return None
-
+        
         try:
             logging.info(f"Creating GitLab repository: {name} at {self.api_url}")
             response = requests.post(
@@ -87,7 +86,7 @@ class GitLabService:
                 headers=self.headers,
                 data=json.dumps(data)
             )
-
+            
             if response.status_code in (201, 200):
                 logging.info(f"GitLab repository created successfully: {name}")
                 return response.json()
@@ -97,13 +96,13 @@ class GitLabService:
         except Exception as e:
             logging.error(f"Exception creating GitLab repository: {str(e)}")
             return None
-
+    
     def delete_repository(self, repo_id):
         """Delete a GitLab repository."""
         if not repo_id:
             logging.warning("Cannot delete GitLab repository: No repo ID provided")
             return True  # Return True to allow cleanup to continue
-
+        
         try:
             response = requests.delete(
                 f"{self.api_url}/projects/{repo_id}",
@@ -118,7 +117,7 @@ class GitLabService:
         except Exception as e:
             logging.error(f"Exception deleting GitLab repository: {str(e)}")
             return False
-
+    
     def get_repository_info(self, repo_id):
         """Get information about a GitLab repository."""
         try:
@@ -126,7 +125,7 @@ class GitLabService:
                 f"{self.api_url}/projects/{repo_id}",
                 headers=self.headers
             )
-
+            
             if response.status_code == 200:
                 return response.json()
             else:
@@ -135,7 +134,7 @@ class GitLabService:
         except Exception as e:
             logging.error(f"Exception getting GitLab repository info: {str(e)}")
             return None
-
+    
     def get_commits(self, repo_id, branch='main'):
         """Get commits for a repository."""
         try:
@@ -143,7 +142,7 @@ class GitLabService:
                 f"{self.api_url}/projects/{repo_id}/repository/commits?ref_name={branch}",
                 headers=self.headers
             )
-
+            
             if response.status_code == 200:
                 return response.json()
             else:
@@ -152,7 +151,7 @@ class GitLabService:
         except Exception as e:
             logging.error(f"Exception getting GitLab commits: {str(e)}")
             return []
-
+    
     def test_connection(self):
         """Test the GitLab connection and return status information."""
         if 'PRIVATE-TOKEN' not in self.headers:
@@ -161,17 +160,17 @@ class GitLabService:
                 'message': 'GitLab PAT not configured',
                 'details': 'Please configure a GitLab Personal Access Token in the settings.'
             }
-
+        
         try:
             # Log the URL we're trying to connect to for debugging
             logging.info(f"Testing GitLab connection to: {self.api_url}")
-
+            
             response = requests.get(f"{self.api_url}/user", headers=self.headers, timeout=10)
-
+            
             # Log the response status and content for debugging
             logging.info(f"GitLab API response status: {response.status_code}")
             logging.info(f"GitLab API response content length: {len(response.content)}")
-
+            
             if response.status_code == 200:
                 try:
                     user_data = response.json()
@@ -200,7 +199,7 @@ class GitLabService:
                 except:
                     if response.content:
                         error_details = f"Raw response: {response.content[:100]}"
-
+            
             return {
                 'success': False,
                 'message': f'GitLab API error: {response.status_code}',

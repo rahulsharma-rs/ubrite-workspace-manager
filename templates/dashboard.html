@@ -18,7 +18,7 @@
             <div class="card-body">
                 <h5 class="card-title">Welcome to UBRITE Project Workspace Manager</h5>
                 <p class="card-text">
-                    UBRITE helps you create and manage research workspaces with integrated Conda environments,
+                    UBRITE helps you create and manage research workspaces with integrated Conda environments, 
                     GitLab repositories, and in-browser IDEs.
                 </p>
                 <div class="d-grid gap-2 d-md-flex justify-content-md-start">
@@ -141,7 +141,7 @@
                     </div>
                     Checking Conda availability...
                 </div>
-
+                
                 <form id="conda-form">
                     <div class="mb-3">
                         <label for="conda-path" class="form-label">Conda Path</label>
@@ -171,7 +171,7 @@
                     </div>
                     Checking JupyterLab availability...
                 </div>
-
+                
                 <form id="jupyter-form">
                     <div class="mb-3">
                         <label for="jupyter-path" class="form-label">JupyterLab Path</label>
@@ -217,19 +217,19 @@
                     statusDiv.innerHTML = '<div class="alert alert-warning">GitLab PAT is not configured</div>';
                     document.getElementById('gitlab-status').innerHTML = '<div class="alert alert-warning">GitLab connection not configured</div>';
                 }
-
+                
                 // Populate GitLab URL if available
                 if (data.gitlab_url) {
                     document.getElementById('gitlab-url').value = data.gitlab_url;
                 }
             });
-
+        
         // Check Conda availability
         fetch('/workspaces/check-conda')
             .then(response => response.json())
             .then(data => {
                 const statusDiv = document.getElementById('conda-status');
-
+                
                 if (data.available) {
                     statusDiv.innerHTML = `
                         <div class="alert alert-success">
@@ -256,13 +256,13 @@
                     </div>
                 `;
             });
-
+        
         // Check JupyterLab availability
         fetch('/ide/check-jupyter')
             .then(response => response.json())
             .then(data => {
                 const statusDiv = document.getElementById('jupyter-status');
-
+                
                 if (data.success) {
                     statusDiv.innerHTML = `
                         <div class="alert alert-success">
@@ -292,26 +292,26 @@
                     </div>
                 `;
             });
-
-
+        
+        
         // Load Python environments
         fetch('/workspaces/python-environments')
             .then(response => response.json())
             .then(data => {
                 const container = document.getElementById('python-envs-container');
-
+                
                 if (!data.environments || data.environments.length === 0) {
                     container.innerHTML = '<div class="alert alert-info">No Python environments detected.</div>';
                     return;
                 }
-
+                
                 // Group environments by type
                 const grouped = {
                     'system': [],
                     'conda': [],
                     'venv': []
                 };
-
+                
                 data.environments.forEach(env => {
                     if (grouped[env.type]) {
                         grouped[env.type].push(env);
@@ -320,9 +320,9 @@
                         grouped.other.push(env);
                     }
                 });
-
+                
                 let html = '';
-
+                
                 // System Python
                 if (grouped.system && grouped.system.length > 0) {
                     html += `
@@ -337,7 +337,7 @@
                                 </thead>
                                 <tbody>
                     `;
-
+                    
                     grouped.system.forEach(env => {
                         html += `
                             <tr>
@@ -346,14 +346,14 @@
                             </tr>
                         `;
                     });
-
+                    
                     html += `
                                 </tbody>
                             </table>
                         </div>
                     `;
                 }
-
+                
                 // Conda environments
                 if (grouped.conda && grouped.conda.length > 0) {
                     html += `
@@ -369,7 +369,7 @@
                                 </thead>
                                 <tbody>
                     `;
-
+                    
                     grouped.conda.forEach(env => {
                         html += `
                             <tr>
@@ -379,14 +379,14 @@
                             </tr>
                         `;
                     });
-
+                    
                     html += `
                                 </tbody>
                             </table>
                         </div>
                     `;
                 }
-
+                
                 // Virtual environments
                 if (grouped.venv && grouped.venv.length > 0) {
                     html += `
@@ -403,7 +403,7 @@
                                 </thead>
                                 <tbody>
                     `;
-
+                    
                     grouped.venv.forEach(env => {
                         html += `
                             <tr>
@@ -414,14 +414,14 @@
                             </tr>
                         `;
                     });
-
+                    
                     html += `
                                 </tbody>
                             </table>
                         </div>
                     `;
                 }
-
+                
                 // Other environments
                 if (grouped.other && grouped.other.length > 0) {
                     html += `
@@ -438,7 +438,7 @@
                                 </thead>
                                 <tbody>
                     `;
-
+                    
                     grouped.other.forEach(env => {
                         html += `
                             <tr>
@@ -449,14 +449,14 @@
                             </tr>
                         `;
                     });
-
+                    
                     html += `
                                 </tbody>
                             </table>
                         </div>
                     `;
                 }
-
+                
                 container.innerHTML = html;
             })
             .catch(error => {
@@ -464,18 +464,18 @@
                 const container = document.getElementById('python-envs-container');
                 container.innerHTML = '<div class="alert alert-danger">Failed to load Python environments.</div>';
             });
-
+        
         // Load environment templates
         fetch('/env-templates')
             .then(response => response.json())
             .then(data => {
                 const container = document.getElementById('template-cards');
-
+                
                 if (data.templates.length === 0) {
                     container.innerHTML = '<div class="col-12"><p>No environment templates found.</p></div>';
                     return;
                 }
-
+                
                 // Template descriptions
                 const descriptions = {
                     'data-science': 'General data science packages (numpy, pandas, matplotlib, scikit-learn)',
@@ -488,7 +488,7 @@
                     'scientific-computing': 'Scientific computing and simulation (FEniCS, PETSc, Numba)',
                     'statistics': 'Statistical analysis packages (statsmodels, PyMC3, R integration)'
                 };
-
+                
                 // Icons for templates
                 const icons = {
                     'data-science': '📊',
@@ -501,13 +501,13 @@
                     'scientific-computing': '🔬',
                     'statistics': '📈'
                 };
-
+                
                 let html = '';
-
+                
                 data.templates.forEach(template => {
                     const description = descriptions[template] || 'Custom environment template';
                     const icon = icons[template] || '📦';
-
+                    
                     html += `
                         <div class="col">
                             <div class="card h-100">
@@ -522,7 +522,7 @@
                         </div>
                     `;
                 });
-
+                
                 container.innerHTML = html;
             })
             .catch(error => {
@@ -530,14 +530,14 @@
                 const container = document.getElementById('template-cards');
                 container.innerHTML = '<div class="col-12"><p>Failed to load environment templates.</p></div>';
             });
-
+        
         // Check application status
         fetch('/app-status')
             .then(response => response.json())
             .then(data => {
                 const statusDiv = document.getElementById('app-status');
                 let html = '<ul class="list-group">';
-
+                
                 // Directory status
                 html += `<li class="list-group-item d-flex justify-content-between align-items-center">
                     UBRITE Root Directory
@@ -545,21 +545,21 @@
                         ${data.directories.ubrite_root ? 'OK' : 'Missing'}
                     </span>
                 </li>`;
-
+                
                 html += `<li class="list-group-item d-flex justify-content-between align-items-center">
                     Database Directory
                     <span class="badge ${data.directories.db_root ? 'bg-success' : 'bg-danger'} rounded-pill">
                         ${data.directories.db_root ? 'OK' : 'Missing'}
                     </span>
                 </li>`;
-
+                
                 html += `<li class="list-group-item d-flex justify-content-between align-items-center">
                     Temp Directory
                     <span class="badge ${data.directories.temp_root ? 'bg-success' : 'bg-danger'} rounded-pill">
                         ${data.directories.temp_root ? 'OK' : 'Missing'}
                     </span>
                 </li>`;
-
+                
                 // Database status
                 html += `<li class="list-group-item d-flex justify-content-between align-items-center">
                     Database Connection
@@ -567,7 +567,7 @@
                         ${data.database ? 'Connected' : 'Error'}
                     </span>
                 </li>`;
-
+                
                 // GitLab status
                 html += `<li class="list-group-item d-flex justify-content-between align-items-center">
                     GitLab Connection
@@ -575,7 +575,7 @@
                         ${data.gitlab.success ? 'Connected' : 'Error'}
                     </span>
                 </li>`;
-
+                
                 // Conda status
                 if (data.conda) {
                     html += `<li class="list-group-item d-flex justify-content-between align-items-center">
@@ -585,7 +585,7 @@
                         </span>
                     </li>`;
                 }
-
+                
                 // JupyterLab status
                 if (data.jupyter) {
                     html += `<li class="list-group-item d-flex justify-content-between align-items-center">
@@ -595,8 +595,8 @@
                         </span>
                     </li>`;
                 }
-
-
+                
+                
                 html += '</ul>';
                 statusDiv.innerHTML = html;
             })
@@ -605,14 +605,14 @@
                 const statusDiv = document.getElementById('app-status');
                 statusDiv.innerHTML = '<div class="alert alert-danger">Failed to load application status.</div>';
             });
-
+        
         // Handle settings form submission
         const settingsForm = document.getElementById('settings-form');
         settingsForm.addEventListener('submit', function(e) {
             e.preventDefault();
-
+            
             const formData = new FormData(settingsForm);
-
+            
             fetch('/settings', {
                 method: 'POST',
                 body: formData
@@ -634,15 +634,15 @@
                 statusDiv.innerHTML = '<div class="alert alert-danger">An error occurred</div>';
             });
         });
-
+        
         // Handle conda form submission
         const condaForm = document.getElementById('conda-form');
         condaForm.addEventListener('submit', function(e) {
             e.preventDefault();
-
+            
             const condaPath = document.getElementById('conda-path').value;
             const statusDiv = document.getElementById('conda-status');
-
+            
             statusDiv.innerHTML = `
                 <div class="alert alert-info">
                     <div class="d-flex align-items-center">
@@ -653,7 +653,7 @@
                     </div>
                 </div>
             `;
-
+            
             fetch('/settings', {
                 method: 'POST',
                 headers: {
@@ -665,7 +665,7 @@
             .then(data => {
                 if (data.success) {
                     statusDiv.innerHTML = '<div class="alert alert-success">Conda path saved successfully</div>';
-
+                    
                     // Check if conda is available with the new path
                     fetch('/workspaces/check-conda')
                         .then(response => response.json())
@@ -695,15 +695,15 @@
                 statusDiv.innerHTML = '<div class="alert alert-danger">An error occurred</div>';
             });
         });
-
+        
         // Handle JupyterLab form submission
         const jupyterForm = document.getElementById('jupyter-form');
         jupyterForm.addEventListener('submit', function(e) {
             e.preventDefault();
-
+            
             const jupyterPath = document.getElementById('jupyter-path').value;
             const statusDiv = document.getElementById('jupyter-status');
-
+            
             statusDiv.innerHTML = `
                 <div class="alert alert-info">
                     <div class="d-flex align-items-center">
@@ -714,7 +714,7 @@
                     </div>
                 </div>
             `;
-
+            
             fetch('/settings', {
                 method: 'POST',
                 headers: {
@@ -726,7 +726,7 @@
             .then(data => {
                 if (data.success) {
                     statusDiv.innerHTML = '<div class="alert alert-success">JupyterLab path saved successfully</div>';
-
+                    
                     // Check if JupyterLab is available with the new path
                     fetch('/ide/check-jupyter')
                         .then(response => response.json())
@@ -760,12 +760,12 @@
                 statusDiv.innerHTML = '<div class="alert alert-danger">An error occurred</div>';
             });
         });
-
+        
         // Test GitLab connection
         document.getElementById('test-gitlab-btn').addEventListener('click', function() {
             testGitLabConnection();
         });
-
+        
         function testGitLabConnection() {
             const statusDiv = document.getElementById('gitlab-status');
             statusDiv.innerHTML = `
@@ -778,7 +778,7 @@
                     </div>
                 </div>
             `;
-
+            
             fetch('/test-gitlab')
                 .then(response => response.json())
                 .then(data => {
@@ -817,7 +817,7 @@
                     </div>
                 </div>
             `;
-
+            
             fetch('/debug-gitlab')
                 .then(response => response.json())
                 .then(data => {
@@ -827,7 +827,7 @@
                             <p><strong>GitLab URL:</strong> ${data.gitlab_url}</p>
                             <p><strong>PAT Configured:</strong> ${data.has_pat ? 'Yes' : 'No'}</p>
                     `;
-
+                    
                     if (data.direct_request) {
                         if (data.direct_request.error) {
                             debugInfo += `
@@ -842,7 +842,7 @@
                             `;
                         }
                     }
-
+                    
                     debugInfo += `
                         <p class="mt-3">
                             <strong>Troubleshooting Tips:</strong>
@@ -855,7 +855,7 @@
                         </p>
                     </div>
                     `;
-
+                    
                     statusDiv.innerHTML = debugInfo;
                 })
                 .catch(error => {

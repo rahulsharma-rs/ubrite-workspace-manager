@@ -1,64 +1,118 @@
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, current_app, Response, \
-    stream_with_context
-import os
-import json
-import logging
+from flask import Blueprint, render_template, request, jsonify, current_app
+from models import Workspace
+from extensions import db
 from services.ide_service import IDEService
+from utils.filesystem import log_event
+from services.analytics_service import AnalyticsService
+import time
+import logging
 
-ide_bp = Blueprint('ide', __name__, url_prefix='/ide')
+ide_bp = Blueprint('ide', __name__)
 ide_service = IDEService()
+analytics_service = AnalyticsService()
 
-
-@ide_bp.route('/jupyter/<workspace_name>')
-def jupyter_proxy(workspace_name):
-    """Proxy requests to JupyterLab."""
-    # Get the token for this workspace
-    token = ide_service.tokens.get(workspace_name)
-    port = ide_service.ports.get(workspace_name)
-
-    if not token or not port:
-        return "JupyterLab is not running for this workspace. Please launch it first.", 404
-
-    # Redirect to JupyterLab
-    return redirect(f"http://localhost:{port}/lab?token={token}")
-
-
-@ide_bp.route('/launch/jupyter', methods=['POST'])
-def launch_jupyter():
-    """Launch JupyterLab for a workspace."""
-    data = request.get_json()
-    workspace_path = data.get('workspace_path')
-
-    if not workspace_path:
-        return jsonify({'success': False, 'message': 'Workspace path is required'})
-
-    success, message = ide_service.launch_jupyter(workspace_path)
-
-    if success:
-        # Extract the workspace name from the path
-        workspace_name = os.path.basename(workspace_path)
-
-        # Return both the direct URL and the Flask proxy URL
-        direct_url = message  # This is now the direct URL with token
-
+@ide_bp.route('/<int:workspace_id>/launch/<ide_type>')
+def launch_ide(workspace_id, ide_type):
+    """Launch an IDE for a workspace."""
+    try:
+        workspace = Workspace.query.get_or_404(workspace_id)
+        
+        start_time = time.time()
+        
+        # Check if JupyterLab is installed before trying to launch it
+        if ide_type == 'jupyter':
+            jupyter_check, jupyter_message = ide_service.check_jupyter_installation()
+            if not jupyter_check:
+                log_event(workspace.id, 'ide_launch_failed', {
+                    'ide_type': ide_type,
+                    'error': jupyter_message
+                })
+                return jsonify({
+                    'success': False,
+                    'message': jupyter_message
+                }), 500
+        
+        if ide_type == 'jupyter':
+            success, result = ide_service.launch_jupyter(workspace.path)
+        elif ide_type == 'vscode':
+            success, result = ide_service.launch_vscode(workspace.path)
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'Unknown IDE type: {ide_type}'
+            }), 400
+        
+        if success:
+            # Log the event
+            duration_sec = time.time() - start_time
+            log_event(workspace.id, 'ide_launched', {
+                'ide_type': ide_type,
+                'duration_sec': duration_sec
+            })
+            
+            # Track analytics
+            analytics_service.track_event('ide_session_started', {
+                'ide_type': ide_type,
+                'duration_sec': duration_sec
+            })
+            
+            return jsonify({
+                'success': True,
+                'url': result
+            })
+        else:
+            # Log the failure
+            log_event(workspace.id, 'ide_launch_failed', {
+                'ide_type': ide_type,
+                'error': result
+            })
+            
+            return jsonify({
+                'success': False,
+                'message': result
+            }), 500
+    except Exception as e:
+        logging.exception(f"Unexpected error launching IDE: {str(e)}")
         return jsonify({
-            'success': True,
-            'url': direct_url,
-            'message': 'JupyterLab launched successfully'
-        })
-    else:
-        return jsonify({'success': False, 'message': message})
+            'success': False,
+            'message': f"An unexpected error occurred: {str(e)}"
+        }), 500
 
+@ide_bp.route('/<int:workspace_id>/stop/<ide_type>')
+def stop_ide(workspace_id, ide_type):
+    """Stop a running IDE."""
+    try:
+        workspace = Workspace.query.get_or_404(workspace_id)
+        
+        success, message = ide_service.stop_ide(workspace.name, ide_type)
+        
+        if success:
+            # Log the event
+            log_event(workspace.id, 'ide_stopped', {
+                'ide_type': ide_type
+            })
+            
+            return jsonify({
+                'success': True,
+                'message': message
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 500
+    except Exception as e:
+        logging.exception(f"Unexpected error stopping IDE: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"An unexpected error occurred: {str(e)}"
+        }), 500
 
-@ide_bp.route('/stop/jupyter/<workspace_name>', methods=['POST'])
-def stop_jupyter(workspace_name):
-    """Stop JupyterLab for a workspace."""
-    success, message = ide_service.stop_ide(workspace_name, 'jupyter')
-    return jsonify({'success': success, 'message': message})
-
-
-@ide_bp.route('/check/jupyter')
+@ide_bp.route('/check-jupyter')
 def check_jupyter():
-    """Check if JupyterLab is installed."""
+    """Check if JupyterLab is installed and available."""
     success, message = ide_service.check_jupyter_installation()
-    return jsonify({'success': success, 'message': message})
+    return jsonify({
+        'success': success,
+        'message': message
+    })

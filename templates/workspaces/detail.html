@@ -45,19 +45,19 @@
                         <dl class="row">
                             <dt class="col-sm-3">Name</dt>
                             <dd class="col-sm-9">{{ workspace.name }}</dd>
-
+                            
                             <dt class="col-sm-3">Path</dt>
                             <dd class="col-sm-9">{{ workspace.path }}</dd>
-
+                            
                             <dt class="col-sm-3">Database</dt>
                             <dd class="col-sm-9">{{ workspace.db_path }}</dd>
-
+                            
                             <dt class="col-sm-3">Environment</dt>
                             <dd class="col-sm-9">{{ workspace.env_type }}</dd>
-
+                            
                             <dt class="col-sm-3">Created</dt>
                             <dd class="col-sm-9">{{ workspace.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</dd>
-
+                            
                             <dt class="col-sm-3">GitLab Repository</dt>
                             <dd class="col-sm-9">
                                 {% if workspace.gitlab_repo_url %}
@@ -70,7 +70,7 @@
                             </dd>
                         </dl>
                     </div>
-
+                    
                     <div class="tab-pane fade" id="git" role="tabpanel" aria-labelledby="git-tab">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5>Git Status</h5>
@@ -98,7 +98,7 @@
                                 </div>
                             </div>
                         </div>
-
+                        
                         <div id="git-status-container">
                             <div class="text-center">
                                 <div class="spinner-border" role="status">
@@ -106,9 +106,9 @@
                                 </div>
                             </div>
                         </div>
-
+                        
                         <hr>
-
+                        
                         <div class="row">
                             <div class="col-md-6">
                                 <h5>Commit Changes</h5>
@@ -124,7 +124,7 @@
                                 </form>
                                 <div id="commit-status" class="mt-2"></div>
                             </div>
-
+                            
                             <div class="col-md-6">
                                 <h5>Create Branch</h5>
                                 <form id="branch-form">
@@ -140,9 +140,9 @@
                                 <div id="branch-status" class="mt-2"></div>
                             </div>
                         </div>
-
+                        
                         <hr>
-
+                        
                         <h5>Recent Commits</h5>
                         <div id="commits-container">
                             <div class="text-center">
@@ -152,7 +152,7 @@
                             </div>
                         </div>
                     </div>
-
+                    
                     <div class="tab-pane fade" id="audit" role="tabpanel" aria-labelledby="audit-tab">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5>Audit Log</h5>
@@ -161,7 +161,7 @@
                                 Export CSV
                             </a>
                         </div>
-
+                        
                         <div id="audit-log-container">
                             <div class="text-center">
                                 <div class="spinner-border" role="status">
@@ -174,7 +174,7 @@
             </div>
         </div>
     </div>
-
+    
     <div class="col-md-4">
         <div class="card mb-4">
             <div class="card-header">
@@ -188,7 +188,7 @@
                     </button>
                 </div>
                 <div id="ide-status" class="mt-3"></div>
-
+                
                 <!-- Add a check JupyterLab button -->
                 <div class="mt-3">
                     <button class="btn btn-sm btn-outline-secondary" id="check-jupyter-btn">
@@ -198,7 +198,7 @@
                 </div>
             </div>
         </div>
-
+        
         <!-- Git Setup Card -->
         <div class="card mb-4" id="git-setup-card" style="display: none;">
             <div class="card-header">
@@ -265,17 +265,17 @@
         const socket = typeof io !== 'undefined' ? io() : {
             on: function() { console.warn('Socket.IO not available'); }
         };
-
+        
         const workspaceId = {{ workspace.id }};
         let gitInitialized = true; // Default to true, will be set to false if Git is not initialized
-
+        
         socket.on('git_commit', function(data) {
             if (data.workspace_id === workspaceId) {
                 loadGitStatus();
                 loadCommits();
             }
         });
-
+        
         socket.on('git_branch_created', function(data) {
             if (data.workspace_id === workspaceId) {
                 loadGitStatus();
@@ -289,38 +289,38 @@
                 loadCommits();
             }
         });
-
+        
         // Load initial data
         loadGitStatus();
         loadCommits();
         loadAuditLog();
-
+        
         // Tab change handlers
         document.getElementById('git-tab').addEventListener('click', function() {
             loadGitStatus();
             loadCommits();
         });
-
+        
         document.getElementById('audit-tab').addEventListener('click', function() {
             loadAuditLog();
         });
-
+        
         // Refresh Git Status
         document.getElementById('refresh-git-btn').addEventListener('click', function() {
             loadGitStatus();
         });
-
+        
         // Initialize Git Repository (if needed)
         document.getElementById('init-git-btn')?.addEventListener('click', function() {
             const btn = this;
             const statusDiv = document.getElementById('git-setup-status');
-
+            
             btn.disabled = true;
             btn.innerHTML = `
                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                 Initializing...
             `;
-
+            
             fetch(`/git/${workspaceId}/init`, {
                 method: 'POST'
             })
@@ -336,7 +336,7 @@
                 if (typeof feather !== 'undefined') {
                     feather.replace();
                 }
-
+                
                 if (data.success) {
                     statusDiv.innerHTML = `
                         <div class="alert alert-success">
@@ -362,7 +362,7 @@
                 if (typeof feather !== 'undefined') {
                     feather.replace();
                 }
-
+                
                 statusDiv.innerHTML = `
                     <div class="alert alert-danger">
                         An error occurred while initializing Git: ${error.message}
@@ -370,11 +370,11 @@
                 `;
             });
         });
-
+        
         // Commit Form
         document.getElementById('commit-form').addEventListener('submit', function(e) {
             e.preventDefault();
-
+            
             if (!gitInitialized) {
                 document.getElementById('commit-status').innerHTML = `
                     <div class="alert alert-warning">
@@ -383,17 +383,17 @@
                 `;
                 return;
             }
-
+            
             const commitBtn = document.getElementById('commit-btn');
             const statusDiv = document.getElementById('commit-status');
             const message = document.getElementById('commit-message').value;
-
+            
             commitBtn.disabled = true;
             commitBtn.innerHTML = `
                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                 Committing...
             `;
-
+            
             fetch(`/git/${workspaceId}/commit`, {
                 method: 'POST',
                 headers: {
@@ -415,7 +415,7 @@
                 if (typeof feather !== 'undefined') {
                     feather.replace();
                 }
-
+                
                 if (data.success) {
                     statusDiv.innerHTML = `
                         <div class="alert alert-success">
@@ -440,7 +440,7 @@
                 if (typeof feather !== 'undefined') {
                     feather.replace();
                 }
-
+                
                 statusDiv.innerHTML = `
                     <div class="alert alert-danger">
                         An error occurred while committing changes: ${error.message}
@@ -448,11 +448,11 @@
                 `;
             });
         });
-
+        
         // Branch Form
         document.getElementById('branch-form').addEventListener('submit', function(e) {
             e.preventDefault();
-
+            
             if (!gitInitialized) {
                 document.getElementById('branch-status').innerHTML = `
                     <div class="alert alert-warning">
@@ -461,17 +461,17 @@
                 `;
                 return;
             }
-
+            
             const branchBtn = document.getElementById('branch-btn');
             const statusDiv = document.getElementById('branch-status');
             const branchName = document.getElementById('branch-name').value;
-
+            
             branchBtn.disabled = true;
             branchBtn.innerHTML = `
                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                 Creating...
             `;
-
+            
             fetch(`/git/${workspaceId}/branch`, {
                 method: 'POST',
                 headers: {
@@ -493,7 +493,7 @@
                 if (typeof feather !== 'undefined') {
                     feather.replace();
                 }
-
+                
                 if (data.success) {
                     statusDiv.innerHTML = `
                         <div class="alert alert-success">
@@ -518,7 +518,7 @@
                 if (typeof feather !== 'undefined') {
                     feather.replace();
                 }
-
+                
                 statusDiv.innerHTML = `
                     <div class="alert alert-danger">
                         An error occurred while creating the branch: ${error.message}
@@ -526,18 +526,18 @@
                 `;
             });
         });
-
+        
         // Launch JupyterLab
         document.getElementById('jupyter-btn').addEventListener('click', function() {
             const btn = this;
             const statusDiv = document.getElementById('ide-status');
-
+            
             btn.disabled = true;
             btn.innerHTML = `
                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                 Launching...
             `;
-
+            
             statusDiv.innerHTML = `
                 <div class="alert alert-info">
                     <div class="d-flex align-items-center">
@@ -548,7 +548,7 @@
                     </div>
                 </div>
             `;
-
+            
             fetch(`/ide/${workspaceId}/launch/jupyter`)
                 .then(response => {
                     if (!response.ok) {
@@ -564,7 +564,7 @@
                     if (typeof feather !== 'undefined') {
                         feather.replace();
                     }
-
+                    
                     if (data.success) {
                         statusDiv.innerHTML = `
                             <div class="alert alert-success">
@@ -590,7 +590,7 @@
                     if (typeof feather !== 'undefined') {
                         feather.replace();
                     }
-
+                    
                     statusDiv.innerHTML = `
                         <div class="alert alert-danger">
                             ${error.message || 'An error occurred while launching JupyterLab.'}
@@ -607,19 +607,19 @@
                     `;
                 });
         });
-
-
+        
+        
         // Check JupyterLab Installation
         document.getElementById('check-jupyter-btn').addEventListener('click', function() {
             const btn = this;
             const statusDiv = document.getElementById('ide-status');
-
+            
             btn.disabled = true;
             btn.innerHTML = `
                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                 Checking...
             `;
-
+            
             fetch('/ide/check-jupyter')
                 .then(response => {
                     if (!response.ok) {
@@ -633,7 +633,7 @@
                     if (typeof feather !== 'undefined') {
                         feather.replace();
                     }
-
+                    
                     if (data.success) {
                         statusDiv.innerHTML = `
                             <div class="alert alert-success">
@@ -659,7 +659,7 @@
                     if (typeof feather !== 'undefined') {
                         feather.replace();
                     }
-
+                    
                     statusDiv.innerHTML = `
                         <div class="alert alert-danger">
                             Failed to check JupyterLab installation: ${error.message}
@@ -667,17 +667,17 @@
                     `;
                 });
         });
-
+        
         // Delete Workspace
         document.getElementById('confirm-delete-btn').addEventListener('click', function() {
             const btn = this;
-
+            
             btn.disabled = true;
             btn.innerHTML = `
                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                 Deleting...
             `;
-
+            
             fetch(`/workspaces/${workspaceId}/delete`, {
                 method: 'POST'
             })
@@ -703,11 +703,11 @@
                 alert(`An error occurred while deleting the workspace: ${error.message}`);
             });
         });
-
+        
         // Helper functions
         function loadGitStatus() {
             const container = document.getElementById('git-status-container');
-
+            
             container.innerHTML = `
                 <div class="text-center">
                     <div class="spinner-border" role="status">
@@ -715,7 +715,7 @@
                     </div>
                 </div>
             `;
-
+            
             fetch(`/git/${workspaceId}/status`)
                 .then(response => {
                     if (!response.ok) {
@@ -732,13 +732,13 @@
                 .then(data => {
                     gitInitialized = true;
                     document.getElementById('git-setup-card').style.display = 'none';
-
+                    
                     // Update current branch display
                     const currentBranchElement = document.getElementById('current-branch');
                     if (currentBranchElement) {
                         currentBranchElement.textContent = data.current_branch || 'N/A';
                     }
-
+                    
                     // Update branch dropdown
                     const branchList = document.getElementById('branch-list');
                     if (branchList) {
@@ -772,7 +772,7 @@
                             branchList.appendChild(li);
                         }
                     }
-
+                    
                     if (data.success) {
                         if (data.changes.length === 0) {
                             container.innerHTML = `
@@ -792,7 +792,7 @@
                                         </thead>
                                         <tbody>
                             `;
-
+                            
                             data.changes.forEach(change => {
                                 html += `
                                     <tr>
@@ -801,13 +801,13 @@
                                     </tr>
                                 `;
                             });
-
+                            
                             html += `
                                         </tbody>
                                     </table>
                                 </div>
                             `;
-
+                            
                             container.innerHTML = html;
                         }
                     } else {
@@ -843,7 +843,7 @@
                 alert('Git is not initialized in this workspace. Please initialize Git first.');
                 return;
             }
-
+            
             fetch(`/git/${workspaceId}/checkout`, {
                 method: 'POST',
                 headers: {
@@ -857,20 +857,20 @@
                         if (data.has_changes) {
                             // Show modal for handling uncommitted changes
                             const modal = new bootstrap.Modal(document.getElementById('branch-switch-modal'));
-
+                            
                             // Set up event listeners for the modal buttons
                             document.getElementById('commit-changes-btn').onclick = function() {
                                 modal.hide();
                                 // Redirect to commit form
                                 document.getElementById('commit-message').focus();
                             };
-
+                            
                             document.getElementById('force-switch-btn').onclick = function() {
                                 modal.hide();
                                 // Force switch branch
                                 forceSwitchBranch(branchName);
                             };
-
+                            
                             modal.show();
                             return;
                         }
@@ -884,14 +884,14 @@
                     // Reload Git status
                     loadGitStatus();
                     loadCommits();
-
+                    
                     // Show success message
                     const branchInfo = document.getElementById('branch-info');
                     const successAlert = document.createElement('div');
                     successAlert.className = 'alert alert-success mt-2';
                     successAlert.textContent = data.message;
                     branchInfo.appendChild(successAlert);
-
+                    
                     // Remove success message after 3 seconds
                     setTimeout(() => {
                         successAlert.remove();
@@ -900,14 +900,14 @@
             })
             .catch(error => {
                 console.error('Error:', error);
-
+                
                 // Show error message
                 const branchInfo = document.getElementById('branch-info');
                 const errorAlert = document.createElement('div');
                 errorAlert.className = 'alert alert-danger mt-2';
                 errorAlert.textContent = `Failed to switch branch: ${error.message}`;
                 branchInfo.appendChild(errorAlert);
-
+                
                 // Remove error message after 5 seconds
                 setTimeout(() => {
                     errorAlert.remove();
@@ -937,14 +937,14 @@
                     // Reload Git status
                     loadGitStatus();
                     loadCommits();
-
+                    
                     // Show success message
                     const branchInfo = document.getElementById('branch-info');
                     const successAlert = document.createElement('div');
                     successAlert.className = 'alert alert-success mt-2';
                     successAlert.textContent = data.message;
                     branchInfo.appendChild(successAlert);
-
+                    
                     // Remove success message after 3 seconds
                     setTimeout(() => {
                         successAlert.remove();
@@ -953,24 +953,24 @@
             })
             .catch(error => {
                 console.error('Error:', error);
-
+                
                 // Show error message
                 const branchInfo = document.getElementById('branch-info');
                 const errorAlert = document.createElement('div');
                 errorAlert.className = 'alert alert-danger mt-2';
                 errorAlert.textContent = `Failed to switch branch: ${error.message}`;
                 branchInfo.appendChild(errorAlert);
-
+                
                 // Remove error message after 5 seconds
                 setTimeout(() => {
                     errorAlert.remove();
                 }, 5000);
             });
         }
-
+        
         function loadCommits() {
             const container = document.getElementById('commits-container');
-
+            
             container.innerHTML = `
                 <div class="text-center">
                     <div class="spinner-border" role="status">
@@ -978,7 +978,7 @@
                     </div>
                 </div>
             `;
-
+            
             fetch(`/git/${workspaceId}/commits`)
                 .then(response => {
                     if (!response.ok) {
@@ -998,10 +998,10 @@
                             let html = `
                                 <div class="list-group">
                             `;
-
+                            
                             data.commits.forEach(commit => {
                                 const date = new Date(commit.created_at).toLocaleString();
-
+                                
                                 html += `
                                     <div class="list-group-item">
                                         <div class="d-flex w-100 justify-content-between">
@@ -1019,11 +1019,11 @@
                                     </div>
                                 `;
                             });
-
+                            
                             html += `
                                 </div>
                             `;
-
+                            
                             container.innerHTML = html;
                         }
                     } else {
@@ -1043,10 +1043,10 @@
                     `;
                 });
         }
-
+        
         function loadAuditLog() {
             const container = document.getElementById('audit-log-container');
-
+            
             container.innerHTML = `
                 <div class="text-center">
                     <div class="spinner-border" role="status">
@@ -1054,7 +1054,7 @@
                     </div>
                 </div>
             `;
-
+            
             fetch(`/workspaces/${workspaceId}/audit-log`)
                 .then(response => {
                     if (!response.ok) {
@@ -1082,11 +1082,11 @@
                                     </thead>
                                     <tbody>
                         `;
-
+                        
                         data.logs.forEach(log => {
                             const date = new Date(log.timestamp).toLocaleString();
                             const details = JSON.stringify(log.details, null, 2);
-
+                            
                             html += `
                                 <tr>
                                     <td>${date}</td>
@@ -1097,13 +1097,13 @@
                                 </tr>
                             `;
                         });
-
+                        
                         html += `
                                     </tbody>
                                 </table>
                             </div>
                         `;
-
+                        
                         container.innerHTML = html;
                     }
                 })
