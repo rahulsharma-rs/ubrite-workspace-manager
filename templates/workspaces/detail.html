@@ -1,0 +1,1121 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ workspace.name }} - UBRITE{% endblock %}
+
+{% block header %}{{ workspace.name }}{% endblock %}
+
+{% block header_buttons %}
+<a href="{{ url_for('files.file_explorer', workspace_id=workspace.id) }}" class="btn btn-sm btn-outline-primary me-2">
+    <span data-feather="folder"></span>
+    File Explorer
+</a>
+<button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#delete-modal">
+    <span data-feather="trash-2"></span>
+    Delete
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="workspace-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-controls="overview" aria-selected="true">
+                            Overview
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="git-tab" data-bs-toggle="tab" data-bs-target="#git" type="button" role="tab" aria-controls="git" aria-selected="false">
+                            Git
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="audit-tab" data-bs-toggle="tab" data-bs-target="#audit" type="button" role="tab" aria-controls="audit" aria-selected="false">
+                            Audit Log
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content" id="workspace-tab-content">
+                    <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+                        <h5>Workspace Details</h5>
+                        <dl class="row">
+                            <dt class="col-sm-3">Name</dt>
+                            <dd class="col-sm-9">{{ workspace.name }}</dd>
+
+                            <dt class="col-sm-3">Path</dt>
+                            <dd class="col-sm-9">{{ workspace.path }}</dd>
+
+                            <dt class="col-sm-3">Database</dt>
+                            <dd class="col-sm-9">{{ workspace.db_path }}</dd>
+
+                            <dt class="col-sm-3">Environment</dt>
+                            <dd class="col-sm-9">{{ workspace.env_type }}</dd>
+
+                            <dt class="col-sm-3">Created</dt>
+                            <dd class="col-sm-9">{{ workspace.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</dd>
+
+                            <dt class="col-sm-3">GitLab Repository</dt>
+                            <dd class="col-sm-9">
+                                {% if workspace.gitlab_repo_url %}
+                                <a href="{{ workspace.gitlab_repo_url }}" target="_blank">
+                                    {{ workspace.gitlab_repo_url }}
+                                </a>
+                                {% else %}
+                                <span class="text-muted">Not configured</span>
+                                {% endif %}
+                            </dd>
+                        </dl>
+                    </div>
+
+                    <div class="tab-pane fade" id="git" role="tabpanel" aria-labelledby="git-tab">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5>Git Status</h5>
+                            <button class="btn btn-sm btn-outline-secondary" id="refresh-git-btn">
+                                <span data-feather="refresh-cw"></span>
+                                Refresh
+                            </button>
+                        </div>
+
+                        <!-- Add current branch display and branch switcher -->
+                        <div class="mb-3" id="branch-info">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="text-muted">Current Branch:</span>
+                                    <strong id="current-branch">Loading...</strong>
+                                </div>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="branchDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <span data-feather="git-branch"></span>
+                                        Switch Branch
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end" id="branch-list" aria-labelledby="branchDropdown">
+                                        <li><a class="dropdown-item" href="#">Loading branches...</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="git-status-container">
+                            <div class="text-center">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Commit Changes</h5>
+                                <form id="commit-form">
+                                    <div class="mb-3">
+                                        <label for="commit-message" class="form-label">Commit Message</label>
+                                        <input type="text" class="form-control" id="commit-message" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary" id="commit-btn">
+                                        <span data-feather="git-commit"></span>
+                                        Commit & Push
+                                    </button>
+                                </form>
+                                <div id="commit-status" class="mt-2"></div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <h5>Create Branch</h5>
+                                <form id="branch-form">
+                                    <div class="mb-3">
+                                        <label for="branch-name" class="form-label">Branch Name</label>
+                                        <input type="text" class="form-control" id="branch-name" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary" id="branch-btn">
+                                        <span data-feather="git-branch"></span>
+                                        Create Branch
+                                    </button>
+                                </form>
+                                <div id="branch-status" class="mt-2"></div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <h5>Recent Commits</h5>
+                        <div id="commits-container">
+                            <div class="text-center">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="audit" role="tabpanel" aria-labelledby="audit-tab">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5>Audit Log</h5>
+                            <a href="{{ url_for('workspaces.export_audit_log', workspace_id=workspace.id) }}" class="btn btn-sm btn-outline-secondary">
+                                <span data-feather="download"></span>
+                                Export CSV
+                            </a>
+                        </div>
+
+                        <div id="audit-log-container">
+                            <div class="text-center">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Launch IDE</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary" id="jupyter-btn">
+                        <span data-feather="code"></span>
+                        Launch JupyterLab
+                    </button>
+                </div>
+                <div id="ide-status" class="mt-3"></div>
+
+                <!-- Add a check JupyterLab button -->
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-secondary" id="check-jupyter-btn">
+                        <span data-feather="check-circle"></span>
+                        Check JupyterLab Installation
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Git Setup Card -->
+        <div class="card mb-4" id="git-setup-card" style="display: none;">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Git Setup</h5>
+            </div>
+            <div class="card-body">
+                <p>This workspace doesn't have Git initialized yet.</p>
+                <button class="btn btn-primary" id="init-git-btn">
+                    <span data-feather="git-branch"></span>
+                    Initialize Git Repository
+                </button>
+                <div id="git-setup-status" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="delete-modal" tabindex="-1" aria-labelledby="delete-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="delete-modal-label">Delete Workspace</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the workspace "{{ workspace.name }}"?</p>
+                <p class="text-danger">This action cannot be undone. All files, the GitLab repository, and the Conda environment will be permanently deleted.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Branch Switch Modal -->
+<div class="modal fade" id="branch-switch-modal" tabindex="-1" aria-labelledby="branch-switch-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="branch-switch-modal-label">Uncommitted Changes</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>You have uncommitted changes that will be lost if you switch branches.</p>
+                <p>What would you like to do?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="commit-changes-btn">Commit Changes</button>
+                <button type="button" class="btn btn-danger" id="force-switch-btn">Force Switch (Lose Changes)</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if Socket.IO is available
+        const socket = typeof io !== 'undefined' ? io() : {
+            on: function() { console.warn('Socket.IO not available'); }
+        };
+
+        const workspaceId = {{ workspace.id }};
+        let gitInitialized = true; // Default to true, will be set to false if Git is not initialized
+
+        socket.on('git_commit', function(data) {
+            if (data.workspace_id === workspaceId) {
+                loadGitStatus();
+                loadCommits();
+            }
+        });
+
+        socket.on('git_branch_created', function(data) {
+            if (data.workspace_id === workspaceId) {
+                loadGitStatus();
+                loadCommits();
+            }
+        });
+
+        socket.on('git_branch_checkout', function(data) {
+            if (data.workspace_id === workspaceId) {
+                loadGitStatus();
+                loadCommits();
+            }
+        });
+
+        // Load initial data
+        loadGitStatus();
+        loadCommits();
+        loadAuditLog();
+
+        // Tab change handlers
+        document.getElementById('git-tab').addEventListener('click', function() {
+            loadGitStatus();
+            loadCommits();
+        });
+
+        document.getElementById('audit-tab').addEventListener('click', function() {
+            loadAuditLog();
+        });
+
+        // Refresh Git Status
+        document.getElementById('refresh-git-btn').addEventListener('click', function() {
+            loadGitStatus();
+        });
+
+        // Initialize Git Repository (if needed)
+        document.getElementById('init-git-btn')?.addEventListener('click', function() {
+            const btn = this;
+            const statusDiv = document.getElementById('git-setup-status');
+
+            btn.disabled = true;
+            btn.innerHTML = `
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                Initializing...
+            `;
+
+            fetch(`/git/${workspaceId}/init`, {
+                method: 'POST'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<span data-feather="git-branch"></span> Initialize Git Repository';
+                if (typeof feather !== 'undefined') {
+                    feather.replace();
+                }
+
+                if (data.success) {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            Git repository initialized successfully.
+                        </div>
+                    `;
+                    // Reload the page after a short delay
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-danger">
+                            ${data.message}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                btn.disabled = false;
+                btn.innerHTML = '<span data-feather="git-branch"></span> Initialize Git Repository';
+                if (typeof feather !== 'undefined') {
+                    feather.replace();
+                }
+
+                statusDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        An error occurred while initializing Git: ${error.message}
+                    </div>
+                `;
+            });
+        });
+
+        // Commit Form
+        document.getElementById('commit-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            if (!gitInitialized) {
+                document.getElementById('commit-status').innerHTML = `
+                    <div class="alert alert-warning">
+                        Git is not initialized in this workspace. Please initialize Git first.
+                    </div>
+                `;
+                return;
+            }
+
+            const commitBtn = document.getElementById('commit-btn');
+            const statusDiv = document.getElementById('commit-status');
+            const message = document.getElementById('commit-message').value;
+
+            commitBtn.disabled = true;
+            commitBtn.innerHTML = `
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                Committing...
+            `;
+
+            fetch(`/git/${workspaceId}/commit`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.message || `HTTP error! Status: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                commitBtn.disabled = false;
+                commitBtn.innerHTML = '<span data-feather="git-commit"></span> Commit & Push';
+                if (typeof feather !== 'undefined') {
+                    feather.replace();
+                }
+
+                if (data.success) {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            Changes committed and pushed successfully.
+                        </div>
+                    `;
+                    document.getElementById('commit-message').value = '';
+                    loadGitStatus();
+                    loadCommits();
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-danger">
+                            ${data.message}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                commitBtn.disabled = false;
+                commitBtn.innerHTML = '<span data-feather="git-commit"></span> Commit & Push';
+                if (typeof feather !== 'undefined') {
+                    feather.replace();
+                }
+
+                statusDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        An error occurred while committing changes: ${error.message}
+                    </div>
+                `;
+            });
+        });
+
+        // Branch Form
+        document.getElementById('branch-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            if (!gitInitialized) {
+                document.getElementById('branch-status').innerHTML = `
+                    <div class="alert alert-warning">
+                        Git is not initialized in this workspace. Please initialize Git first.
+                    </div>
+                `;
+                return;
+            }
+
+            const branchBtn = document.getElementById('branch-btn');
+            const statusDiv = document.getElementById('branch-status');
+            const branchName = document.getElementById('branch-name').value;
+
+            branchBtn.disabled = true;
+            branchBtn.innerHTML = `
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                Creating...
+            `;
+
+            fetch(`/git/${workspaceId}/branch`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ branch_name: branchName })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.message || `HTTP error! Status: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                branchBtn.disabled = false;
+                branchBtn.innerHTML = '<span data-feather="git-branch"></span> Create Branch';
+                if (typeof feather !== 'undefined') {
+                    feather.replace();
+                }
+
+                if (data.success) {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            Branch created successfully.
+                        </div>
+                    `;
+                    document.getElementById('branch-name').value = '';
+                    loadGitStatus();
+                    loadCommits();
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-danger">
+                            ${data.message}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                branchBtn.disabled = false;
+                branchBtn.innerHTML = '<span data-feather="git-branch"></span> Create Branch';
+                if (typeof feather !== 'undefined') {
+                    feather.replace();
+                }
+
+                statusDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        An error occurred while creating the branch: ${error.message}
+                    </div>
+                `;
+            });
+        });
+
+        // Launch JupyterLab
+        document.getElementById('jupyter-btn').addEventListener('click', function() {
+            const btn = this;
+            const statusDiv = document.getElementById('ide-status');
+
+            btn.disabled = true;
+            btn.innerHTML = `
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                Launching...
+            `;
+
+            statusDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                            <span class="visually-hidden">Launching...</span>
+                        </div>
+                        Launching JupyterLab... This may take a moment.
+                    </div>
+                </div>
+            `;
+
+            fetch(`/ide/${workspaceId}/launch/jupyter`)
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.message || 'Failed to launch JupyterLab');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span data-feather="code"></span> Launch JupyterLab';
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
+                    }
+
+                    if (data.success) {
+                        statusDiv.innerHTML = `
+                            <div class="alert alert-success">
+                                JupyterLab launched successfully.
+                                <a href="${data.url}" target="_blank" class="alert-link">
+                                    Open JupyterLab
+                                </a>
+                            </div>
+                        `;
+                        window.open(data.url, '_blank');
+                    } else {
+                        statusDiv.innerHTML = `
+                            <div class="alert alert-danger">
+                                ${data.message}
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    btn.disabled = false;
+                    btn.innerHTML = '<span data-feather="code"></span> Launch JupyterLab';
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
+                    }
+
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-danger">
+                            ${error.message || 'An error occurred while launching JupyterLab.'}
+                        </div>
+                        <div class="mt-2">
+                            <p><strong>Troubleshooting:</strong></p>
+                            <ul>
+                                <li>Make sure JupyterLab is installed in your environment</li>
+                                <li>Check if port 8888 is available</li>
+                                <li>Try installing JupyterLab with: <code>pip install jupyterlab</code></li>
+                                <li>Check the application logs for more detailed error information</li>
+                            </ul>
+                        </div>
+                    `;
+                });
+        });
+
+
+        // Check JupyterLab Installation
+        document.getElementById('check-jupyter-btn').addEventListener('click', function() {
+            const btn = this;
+            const statusDiv = document.getElementById('ide-status');
+
+            btn.disabled = true;
+            btn.innerHTML = `
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                Checking...
+            `;
+
+            fetch('/ide/check-jupyter')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span data-feather="check-circle"></span> Check JupyterLab Installation';
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
+                    }
+
+                    if (data.success) {
+                        statusDiv.innerHTML = `
+                            <div class="alert alert-success">
+                                ${data.message}
+                            </div>
+                        `;
+                    } else {
+                        statusDiv.innerHTML = `
+                            <div class="alert alert-warning">
+                                ${data.message}
+                            </div>
+                            <div class="mt-2">
+                                <p>To install JupyterLab:</p>
+                                <pre><code>pip install jupyterlab</code></pre>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    btn.disabled = false;
+                    btn.innerHTML = '<span data-feather="check-circle"></span> Check JupyterLab Installation';
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
+                    }
+
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-danger">
+                            Failed to check JupyterLab installation: ${error.message}
+                        </div>
+                    `;
+                });
+        });
+
+        // Delete Workspace
+        document.getElementById('confirm-delete-btn').addEventListener('click', function() {
+            const btn = this;
+
+            btn.disabled = true;
+            btn.innerHTML = `
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                Deleting...
+            `;
+
+            fetch(`/workspaces/${workspaceId}/delete`, {
+                method: 'POST'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    window.location.href = '/workspaces';
+                } else {
+                    btn.disabled = false;
+                    btn.innerHTML = 'Delete';
+                    alert('Failed to delete workspace.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                btn.disabled = false;
+                btn.innerHTML = 'Delete';
+                alert(`An error occurred while deleting the workspace: ${error.message}`);
+            });
+        });
+
+        // Helper functions
+        function loadGitStatus() {
+            const container = document.getElementById('git-status-container');
+
+            container.innerHTML = `
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            `;
+
+            fetch(`/git/${workspaceId}/status`)
+                .then(response => {
+                    if (!response.ok) {
+                        if (response.status === 404) {
+                            // Git not initialized
+                            gitInitialized = false;
+                            document.getElementById('git-setup-card').style.display = 'block';
+                            throw new Error('Git repository not initialized');
+                        }
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    gitInitialized = true;
+                    document.getElementById('git-setup-card').style.display = 'none';
+
+                    // Update current branch display
+                    const currentBranchElement = document.getElementById('current-branch');
+                    if (currentBranchElement) {
+                        currentBranchElement.textContent = data.current_branch || 'N/A';
+                    }
+
+                    // Update branch dropdown
+                    const branchList = document.getElementById('branch-list');
+                    if (branchList) {
+                        branchList.innerHTML = '';
+                        if (data.branches && data.branches.length > 0) {
+                            data.branches.forEach(branch => {
+                                const li = document.createElement('li');
+                                const a = document.createElement('a');
+                                a.className = 'dropdown-item';
+                                a.href = '#';
+                                a.textContent = branch;
+                                if (branch === data.current_branch) {
+                                    a.className += ' active';
+                                    a.setAttribute('aria-current', 'true');
+                                } else {
+                                    a.addEventListener('click', function(e) {
+                                        e.preventDefault();
+                                        switchBranch(branch);
+                                    });
+                                }
+                                li.appendChild(a);
+                                branchList.appendChild(li);
+                            });
+                        } else {
+                            const li = document.createElement('li');
+                            const a = document.createElement('a');
+                            a.className = 'dropdown-item disabled';
+                            a.href = '#';
+                            a.textContent = 'No branches found';
+                            li.appendChild(a);
+                            branchList.appendChild(li);
+                        }
+                    }
+
+                    if (data.success) {
+                        if (data.changes.length === 0) {
+                            container.innerHTML = `
+                                <div class="alert alert-info">
+                                    No changes detected. Working directory is clean.
+                                </div>
+                            `;
+                        } else {
+                            let html = `
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Status</th>
+                                                <th>File</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                            `;
+
+                            data.changes.forEach(change => {
+                                html += `
+                                    <tr>
+                                        <td><code>${change.status}</code></td>
+                                        <td>${change.filename}</td>
+                                    </tr>
+                                `;
+                            });
+
+                            html += `
+                                        </tbody>
+                                    </table>
+                                </div>
+                            `;
+
+                            container.innerHTML = html;
+                        }
+                    } else {
+                        container.innerHTML = `
+                            <div class="alert alert-danger">
+                                ${data.message || 'Failed to load Git status'}
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    if (error.message === 'Git repository not initialized') {
+                        container.innerHTML = `
+                            <div class="alert alert-warning">
+                                Git repository is not initialized in this workspace.
+                                Please use the Git Setup panel to initialize Git.
+                            </div>
+                        `;
+                    } else {
+                        container.innerHTML = `
+                            <div class="alert alert-danger">
+                                Failed to load Git status: ${error.message}
+                            </div>
+                        `;
+                    }
+                });
+        }
+
+        // Add the switchBranch function
+        function switchBranch(branchName) {
+            if (!gitInitialized) {
+                alert('Git is not initialized in this workspace. Please initialize Git first.');
+                return;
+            }
+
+            fetch(`/git/${workspaceId}/checkout`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ branch_name: branchName })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        if (data.has_changes) {
+                            // Show modal for handling uncommitted changes
+                            const modal = new bootstrap.Modal(document.getElementById('branch-switch-modal'));
+
+                            // Set up event listeners for the modal buttons
+                            document.getElementById('commit-changes-btn').onclick = function() {
+                                modal.hide();
+                                // Redirect to commit form
+                                document.getElementById('commit-message').focus();
+                            };
+
+                            document.getElementById('force-switch-btn').onclick = function() {
+                                modal.hide();
+                                // Force switch branch
+                                forceSwitchBranch(branchName);
+                            };
+
+                            modal.show();
+                            return;
+                        }
+                        throw new Error(data.message || `HTTP error! Status: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data && data.success) {
+                    // Reload Git status
+                    loadGitStatus();
+                    loadCommits();
+
+                    // Show success message
+                    const branchInfo = document.getElementById('branch-info');
+                    const successAlert = document.createElement('div');
+                    successAlert.className = 'alert alert-success mt-2';
+                    successAlert.textContent = data.message;
+                    branchInfo.appendChild(successAlert);
+
+                    // Remove success message after 3 seconds
+                    setTimeout(() => {
+                        successAlert.remove();
+                    }, 3000);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+
+                // Show error message
+                const branchInfo = document.getElementById('branch-info');
+                const errorAlert = document.createElement('div');
+                errorAlert.className = 'alert alert-danger mt-2';
+                errorAlert.textContent = `Failed to switch branch: ${error.message}`;
+                branchInfo.appendChild(errorAlert);
+
+                // Remove error message after 5 seconds
+                setTimeout(() => {
+                    errorAlert.remove();
+                }, 5000);
+            });
+        }
+
+        // Add the forceSwitchBranch function
+        function forceSwitchBranch(branchName) {
+            fetch(`/git/${workspaceId}/checkout`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ branch_name: branchName, force: true })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.message || `HTTP error! Status: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Reload Git status
+                    loadGitStatus();
+                    loadCommits();
+
+                    // Show success message
+                    const branchInfo = document.getElementById('branch-info');
+                    const successAlert = document.createElement('div');
+                    successAlert.className = 'alert alert-success mt-2';
+                    successAlert.textContent = data.message;
+                    branchInfo.appendChild(successAlert);
+
+                    // Remove success message after 3 seconds
+                    setTimeout(() => {
+                        successAlert.remove();
+                    }, 3000);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+
+                // Show error message
+                const branchInfo = document.getElementById('branch-info');
+                const errorAlert = document.createElement('div');
+                errorAlert.className = 'alert alert-danger mt-2';
+                errorAlert.textContent = `Failed to switch branch: ${error.message}`;
+                branchInfo.appendChild(errorAlert);
+
+                // Remove error message after 5 seconds
+                setTimeout(() => {
+                    errorAlert.remove();
+                }, 5000);
+            });
+        }
+
+        function loadCommits() {
+            const container = document.getElementById('commits-container');
+
+            container.innerHTML = `
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            `;
+
+            fetch(`/git/${workspaceId}/commits`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        if (data.commits.length === 0) {
+                            container.innerHTML = `
+                                <div class="alert alert-info">
+                                    No commits found.
+                                </div>
+                            `;
+                        } else {
+                            let html = `
+                                <div class="list-group">
+                            `;
+
+                            data.commits.forEach(commit => {
+                                const date = new Date(commit.created_at).toLocaleString();
+
+                                html += `
+                                    <div class="list-group-item">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h6 class="mb-1">${commit.title}</h6>
+                                            <small>${date}</small>
+                                        </div>
+                                        <p class="mb-1">
+                                            <small class="text-muted">
+                                                ${commit.author_name} &lt;${commit.author_email}&gt;
+                                            </small>
+                                        </p>
+                                        <small>
+                                            <code>${commit.short_id}</code>
+                                        </small>
+                                    </div>
+                                `;
+                            });
+
+                            html += `
+                                </div>
+                            `;
+
+                            container.innerHTML = html;
+                        }
+                    } else {
+                        container.innerHTML = `
+                            <div class="alert alert-danger">
+                                ${data.message}
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    container.innerHTML = `
+                        <div class="alert alert-danger">
+                            Failed to load commits: ${error.message}
+                        </div>
+                    `;
+                });
+        }
+
+        function loadAuditLog() {
+            const container = document.getElementById('audit-log-container');
+
+            container.innerHTML = `
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            `;
+
+            fetch(`/workspaces/${workspaceId}/audit-log`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.logs.length === 0) {
+                        container.innerHTML = `
+                            <div class="alert alert-info">
+                                No audit logs found.
+                            </div>
+                        `;
+                    } else {
+                        let html = `
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Timestamp</th>
+                                            <th>Event</th>
+                                            <th>Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                        `;
+
+                        data.logs.forEach(log => {
+                            const date = new Date(log.timestamp).toLocaleString();
+                            const details = JSON.stringify(log.details, null, 2);
+
+                            html += `
+                                <tr>
+                                    <td>${date}</td>
+                                    <td>${log.event_type}</td>
+                                    <td>
+                                        <pre class="mb-0"><code>${details}</code></pre>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+
+                        html += `
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+
+                        container.innerHTML = html;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    container.innerHTML = `
+                        <div class="alert alert-danger">
+                            Failed to load audit log: ${error.message}
+                        </div>
+                    `;
+                });
+        }
+    });
+</script>
+{% endblock %}

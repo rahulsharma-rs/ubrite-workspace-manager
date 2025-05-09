@@ -1,0 +1,33 @@
+name: computer-vision
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+  - defaults
+dependencies:
+  - python=3.9
+  - numpy
+  - pandas
+  - matplotlib
+  - scikit-learn
+  - scikit-image
+  - opencv
+  - pytorch
+  - torchvision
+  - cudatoolkit=11.3
+  - jupyter
+  - jupyterlab
+  - ipywidgets
+  - pillow
+  - pip
+  - pip:
+    - albumentations
+    - imgaug
+    - detectron2
+    - kornia
+    - segmentation-models-pytorch
+    - timm
+    - efficientnet-pytorch
+    - mmcv
+    - mmdet
+    - mmsegmentation

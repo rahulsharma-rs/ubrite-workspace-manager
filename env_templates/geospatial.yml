@@ -1,0 +1,37 @@
+name: geospatial
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - numpy
+  - pandas
+  - matplotlib
+  - scipy
+  - jupyter
+  - jupyterlab
+  - ipywidgets
+  - geopandas
+  - rasterio
+  - gdal
+  - fiona
+  - shapely
+  - pyproj
+  - cartopy
+  - folium
+  - geopy
+  - rtree
+  - pysal
+  - contextily
+  - earthpy
+  - xarray
+  - netcdf4
+  - rioxarray
+  - pip
+  - pip:
+    - osmnx
+    - pydeck
+    - keplergl
+    - mapboxgl
+    - leafmap
+    - geemap

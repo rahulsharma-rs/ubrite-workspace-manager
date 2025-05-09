@@ -1,0 +1,34 @@
+name: deep-learning
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+  - defaults
+dependencies:
+  - python=3.9
+  - numpy
+  - pandas
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - pytorch
+  - torchvision
+  - torchaudio
+  - cudatoolkit=11.3
+  - tensorflow
+  - keras
+  - jupyter
+  - jupyterlab
+  - ipywidgets
+  - tqdm
+  - pillow
+  - h5py
+  - pip
+  - pip:
+    - transformers
+    - pytorch-lightning
+    - tensorboard
+    - optuna
+    - ray[tune]
+    - wandb
+    - mlflow

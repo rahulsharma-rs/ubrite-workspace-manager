@@ -1,0 +1,36 @@
+name: bioinformatics
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.9
+  - numpy
+  - pandas
+  - matplotlib
+  - seaborn
+  - scipy
+  - biopython
+  - blast
+  - bowtie2
+  - bwa
+  - samtools
+  - bedtools
+  - vcftools
+  - bcftools
+  - fastqc
+  - trimmomatic
+  - star
+  - hisat2
+  - salmon
+  - jupyter
+  - jupyterlab
+  - ipywidgets
+  - pip
+  - pip:
+    - scanpy
+    - anndata
+    - pysam
+    - pyvcf
+    - deeptools
+    - multiqc

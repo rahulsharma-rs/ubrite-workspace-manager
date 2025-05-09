@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+
+{% block title %}Workspaces - UBRITE{% endblock %}
+
+{% block header %}Workspaces{% endblock %}
+
+{% block header_buttons %}
+<a href="{{ url_for('workspaces.create_workspace') }}" class="btn btn-sm btn-primary">
+    <span data-feather="plus"></span>
+    Create Workspace
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <div id="workspaces-container">
+            <div class="text-center">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load workspaces
+        loadWorkspaces();
+        
+        // Set up Socket.IO
+        const socket = io();
+        
+        socket.on('workspace_created', function(workspace) {
+            loadWorkspaces();
+        });
+        
+        socket.on('workspace_deleted', function(data) {
+            loadWorkspaces();
+        });
+    });
+    
+    function loadWorkspaces() {
+        fetch('/workspaces/api/list')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('workspaces-container');
+                
+                if (data.workspaces.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center">
+                            <p>No workspaces found.</p>
+                            <a href="{{ url_for('workspaces.create_workspace') }}" class="btn btn-primary">
+                                Create your first workspace
+                            </a>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = `
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Environment</th>
+                                    <th>Created</th>
+                                    <th>Last Accessed</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                data.workspaces.forEach(workspace => {
+                    const created = new Date(workspace.created_at).toLocaleString();
+                    const lastAccessed = new Date(workspace.last_accessed).toLocaleString();
+                    
+                    html += `
+                        <tr>
+                            <td>
+                                <a href="/workspaces/${workspace.id}">
+                                    ${workspace.name}
+                                </a>
+                            </td>
+                            <td>${workspace.env_type}</td>
+                            <td>${created}</td>
+                            <td>${lastAccessed}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="/workspaces/${workspace.id}" class="btn btn-outline-primary">
+                                        Details
+                                    </a>
+                                    <a href="/files/${workspace.id}/explorer" class="btn btn-outline-primary">
+                                        <span data-feather="folder"></span>
+                                        Files
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                container.innerHTML = html;
+
+                // Initialize Feather icons
+                if (typeof feather !== 'undefined') {
+                    feather.replace();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const container = document.getElementById('workspaces-container');
+                container.innerHTML = `
+                    <div class="alert alert-danger">
+                        Failed to load workspaces.
+                    </div>
+                `;
+            });
+    }
+</script>
+{% endblock %}

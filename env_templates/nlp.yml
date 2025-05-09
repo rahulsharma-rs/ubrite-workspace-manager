@@ -1,0 +1,30 @@
+name: nlp
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - numpy
+  - pandas
+  - matplotlib
+  - scikit-learn
+  - jupyter
+  - jupyterlab
+  - ipywidgets
+  - pip
+  - pip:
+    - nltk
+    - spacy
+    - gensim
+    - transformers
+    - datasets
+    - torch
+    - tensorflow
+    - huggingface-hub
+    - sentence-transformers
+    - textblob
+    - wordcloud
+    - fasttext
+    - allennlp
+    - stanza
+    - flair

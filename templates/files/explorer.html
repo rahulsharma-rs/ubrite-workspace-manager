@@ -1,0 +1,1535 @@
+{% extends 'base.html' %}
+
+{% block title %}File Explorer - {{ workspace.name }} - UBRITE{% endblock %}
+
+{% block header %}File Explorer - {{ workspace.name }}{% endblock %}
+
+{% block header_buttons %}
+<a href="{{ url_for('workspaces.workspace_detail', workspace_id=workspace.id) }}" class="btn btn-sm btn-outline-secondary me-2">
+  <span data-feather="arrow-left"></span>
+  Back to Workspace
+</a>
+<button class="btn btn-sm btn-primary" id="launch-jupyter-btn">
+  <span data-feather="code"></span>
+  Launch JupyterLab
+</button>
+<button class="btn btn-sm btn-outline-secondary" id="test-jupyter-modal-btn" style="display: none;">
+  Test Modal
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-3">
+      <!-- File Explorer Sidebar -->
+      <div class="card mb-4">
+          <div class="card-header">
+              <h5 class="card-title mb-0">Explorer</h5>
+          </div>
+          <div class="card-body p-0">
+              <div class="list-group list-group-flush" id="folder-tree">
+                  <div class="text-center py-3">
+                      <div class="spinner-border spinner-border-sm" role="status">
+                          <span class="visually-hidden">Loading...</span>
+                      </div>
+                      Loading...
+                  </div>
+              </div>
+          </div>
+          <div class="card-footer">
+              <div class="dropdown">
+                  <button class="btn btn-outline-primary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                      <span data-feather="plus"></span> Create New
+                  </button>
+                  <ul class="dropdown-menu w-100">
+                      <li><a class="dropdown-item" href="#" id="create-folder-btn">
+                          <span data-feather="folder-plus"></span> New Folder
+                      </a></li>
+                      <li><a class="dropdown-item" href="#" id="create-file-btn">
+                          <span data-feather="file-plus"></span> New File
+                      </a></li>
+                      <li><a class="dropdown-item" href="#" id="upload-file-btn">
+                          <span data-feather="upload"></span> Upload File
+                      </a></li>
+                  </ul>
+              </div>
+          </div>
+      </div>
+
+      <!-- Git Operations -->
+      <div class="card mb-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
+              <h5 class="card-title mb-0">Git Operations</h5>
+              <div class="dropdown">
+                  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="branch-dropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                      <span data-feather="git-branch"></span>
+                      <span id="current-branch">Loading...</span>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end" id="branch-list">
+                      <li><a class="dropdown-item" href="#" id="create-branch-btn">
+                          <span data-feather="plus"></span> New Branch
+                      </a></li>
+                      <li><hr class="dropdown-divider"></li>
+                      <!-- Branch list will be populated here -->
+                  </ul>
+              </div>
+          </div>
+          <div class="card-body">
+              <div id="git-status-container">
+                  <div class="text-center">
+                      <div class="spinner-border spinner-border-sm" role="status">
+                          <span class="visually-hidden">Loading...</span>
+                      </div>
+                      Loading Git status...
+                  </div>
+              </div>
+              <hr>
+              <form id="commit-form" class="mb-3">
+                  <div class="mb-2">
+                      <label for="commit-message" class="form-label">Commit Message</label>
+                      <input type="text" class="form-control form-control-sm" id="commit-message" required>
+                  </div>
+                  <button type="submit" class="btn btn-sm btn-primary w-100" id="commit-btn">
+                      <span data-feather="git-commit"></span>
+                      Commit & Push
+                  </button>
+              </form>
+              <div id="commit-status"></div>
+          </div>
+      </div>
+  </div>
+
+  <div class="col-md-9">
+      <!-- File Browser -->
+      <div class="card mb-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
+              <div>
+                  <h5 class="card-title mb-0">Files</h5>
+                  <nav aria-label="breadcrumb">
+                      <ol class="breadcrumb mb-0" id="path-breadcrumb">
+                          <li class="breadcrumb-item"><a href="#" data-path="" id="root-folder-link">Root</a></li>
+                      </ol>
+                  </nav>
+              </div>
+              <div>
+                  <button class="btn btn-sm btn-outline-secondary me-2" id="back-button">
+                      <span data-feather="arrow-up"></span>
+                      Up
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" id="refresh-files-btn">
+                      <span data-feather="refresh-cw"></span>
+                      Refresh
+                  </button>
+              </div>
+          </div>
+          <div class="card-body">
+              <div id="files-container">
+                  <div class="text-center">
+                      <div class="spinner-border" role="status">
+                          <span class="visually-hidden">Loading...</span>
+                      </div>
+                      Loading files...
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <!-- File Editor -->
+      <div class="card mb-4" id="file-editor-card" style="display: none;">
+          <div class="card-header d-flex justify-content-between align-items-center">
+              <h5 class="card-title mb-0" id="editor-filename">File Editor</h5>
+              <div>
+                  <button class="btn btn-sm btn-outline-secondary me-2" id="close-editor-btn">
+                      <span data-feather="x"></span>
+                      Close
+                  </button>
+                  <button class="btn btn-sm btn-primary" id="save-file-btn">
+                      <span data-feather="save"></span>
+                      Save
+                  </button>
+              </div>
+          </div>
+          <div class="card-body p-0">
+              <textarea id="file-editor" class="form-control" style="height: 400px; font-family: monospace;"></textarea>
+          </div>
+      </div>
+
+      <!-- File Viewer -->
+      <div class="card mb-4" id="file-viewer-card" style="display: none;">
+          <div class="card-header d-flex justify-content-between align-items-center">
+              <h5 class="card-title mb-0" id="viewer-filename">File Viewer</h5>
+              <div>
+                  <a href="#" class="btn btn-sm btn-outline-secondary me-2" id="download-file-btn">
+                      <span data-feather="download"></span>
+                      Download
+                  </a>
+                  <button class="btn btn-sm btn-outline-secondary" id="close-viewer-btn">
+                      <span data-feather="x"></span>
+                      Close
+                  </button>
+              </div>
+          </div>
+          <div class="card-body" id="file-viewer-content">
+          </div>
+      </div>
+  </div>
+</div>
+
+<!-- Create Folder Modal -->
+<div class="modal fade" id="create-folder-modal" tabindex="-1" aria-labelledby="create-folder-modal-label" aria-hidden="true">
+  <div class="modal-dialog">
+      <div class="modal-content">
+          <div class="modal-header">
+              <h5 class="modal-title" id="create-folder-modal-label">Create New Folder</h5>
+              <button type="button" class="btn btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+              <form id="create-folder-form">
+                  <div class="mb-3">
+                      <label for="folder-name" class="form-label">Folder Name</label>
+                      <input type="text" class="form-control" id="folder-name" required>
+                  </div>
+              </form>
+          </div>
+          <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-primary" id="confirm-create-folder-btn">Create</button>
+          </div>
+      </div>
+  </div>
+</div>
+
+<!-- Create File Modal -->
+<div class="modal fade" id="create-file-modal" tabindex="-1" aria-labelledby="create-file-modal-label" aria-hidden="true">
+  <div class="modal-dialog">
+      <div class="modal-content">
+          <div class="modal-header">
+              <h5 class="modal-title" id="create-file-modal-label">Create New File</h5>
+              <button type="button" class="btn btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+              <form id="create-file-form">
+                  <div class="mb-3">
+                      <label for="file-name" class="form-label">File Name</label>
+                      <input type="text" class="form-control" id="file-name" required>
+                  </div>
+              </form>
+          </div>
+          <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-primary" id="confirm-create-file-btn">Create</button>
+          </div>
+      </div>
+  </div>
+</div>
+
+<!-- Upload File Modal -->
+<div class="modal fade" id="upload-file-modal" tabindex="-1" aria-labelledby="upload-file-modal-label" aria-hidden="true">
+  <div class="modal-dialog">
+      <div class="modal-content">
+          <div class="modal-header">
+              <h5 class="modal-title" id="upload-file-modal-label">Upload File</h5>
+              <button type="button" class="btn btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+              <form id="upload-file-form">
+                  <div class="mb-3">
+                      <label for="file-upload" class="form-label">Select File</label>
+                      <input type="file" class="form-control" id="file-upload" required>
+                  </div>
+              </form>
+          </div>
+          <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-primary" id="confirm-upload-file-btn">Upload</button>
+          </div>
+      </div>
+  </div>
+</div>
+
+<!-- Create Branch Modal -->
+<div class="modal fade" id="create-branch-modal" tabindex="-1" aria-labelledby="create-branch-modal-label" aria-hidden="true">
+  <div class="modal-dialog">
+      <div class="modal-content">
+          <div class="modal-header">
+              <h5 class="modal-title" id="create-branch-modal-label">Create New Branch</h5>
+              <button type="button" class="btn btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+              <form id="create-branch-form">
+                  <div class="mb-3">
+                      <label for="branch-name" class="form-label">Branch Name</label>
+                      <input type="text" class="form-control" id="branch-name" required>
+                  </div>
+              </form>
+          </div>
+          <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-primary" id="confirm-create-branch-btn">Create</button>
+          </div>
+      </div>
+  </div>
+</div>
+
+<!-- Rename Item Modal -->
+<div class="modal fade" id="rename-modal" tabindex="-1" aria-labelledby="rename-modal-label" aria-hidden="true">
+  <div class="modal-dialog">
+      <div class="modal-content">
+          <div class="modal-header">
+              <h5 class="modal-title" id="rename-modal-label">Rename Item</h5>
+              <button type="button" class="btn btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+              <form id="rename-form">
+                  <div class="mb-3">
+                      <label for="new-name" class="form-label">New Name</label>
+                      <input type="text" class="form-control" id="new-name" required>
+                      <input type="hidden" id="rename-path">
+                  </div>
+              </form>
+          </div>
+          <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-primary" id="confirm-rename-btn">Rename</button>
+          </div>
+      </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="delete-modal" tabindex="-1" aria-labelledby="delete-modal-label" aria-hidden="true">
+  <div class="modal-dialog">
+      <div class="modal-content">
+          <div class="modal-header">
+              <h5 class="modal-title" id="delete-modal-label">Delete Item</h5>
+              <button type="button" class="btn btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+              <p>Are you sure you want to delete <span id="delete-item-name"></span>?</p>
+              <p class="text-danger">This action cannot be undone.</p>
+              <input type="hidden" id="delete-path">
+          </div>
+          <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-danger" id="confirm-delete-btn">Delete</button>
+          </div>
+      </div>
+  </div>
+</div>
+
+<!-- Checkout Confirmation Modal -->
+<div class="modal fade" id="checkout-modal" tabindex="-1" aria-labelledby="checkout-modal-label" aria-hidden="true">
+  <div class="modal-dialog">
+      <div class="modal-content">
+          <div class="modal-header">
+              <h5 class="modal-title" id="checkout-modal-label">Checkout Branch</h5>
+              <button type="button" class="btn btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+              <p>You have uncommitted changes. What would you like to do?</p>
+              <input type="hidden" id="checkout-branch-name">
+          </div>
+          <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-warning" id="force-checkout-btn">Force Checkout (Discard Changes)</button>
+              <button type="button" class="btn btn-primary" id="commit-before-checkout-btn">Commit Changes First</button>
+          </div>
+      </div>
+  </div>
+</div>
+
+<!-- JupyterLab URL Modal -->
+<div class="modal fade" id="jupyter-url-modal" tabindex="-1" aria-labelledby="jupyter-url-modal-label" aria-hidden="true">
+  <div class="modal-dialog">
+      <div class="modal-content">
+          <div class="modal-header">
+              <h5 class="modal-title" id="jupyter-url-modal-label">
+                  <span data-feather="code"></span> JupyterLab Ready
+              </h5>
+              <button type="button" class="btn btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+              <div class="alert alert-success">
+                  <span data-feather="check-circle"></span> JupyterLab has been successfully launched!
+              </div>
+
+              <div class="mb-3">
+                  <label for="jupyter-url" class="form-label">JupyterLab URL:</label>
+                  <div class="input-group">
+                      <input type="text" class="form-control" id="jupyter-url" readonly>
+                      <button class="btn btn-outline-secondary" type="button" id="copy-url-btn" title="Copy URL">
+                          <span data-feather="copy"></span>
+                      </button>
+                  </div>
+                  <div class="form-text" id="copy-status"></div>
+              </div>
+
+              <div class="mb-3">
+                  <label class="form-label">Alternative URL:</label>
+                  <div class="input-group">
+                      <input type="text" class="form-control" id="jupyter-direct-url" readonly>
+                      <button class="btn btn-outline-secondary" type="button" id="copy-direct-url-btn" title="Copy Direct URL">
+                          <span data-feather="copy"></span>
+                      </button>
+                  </div>
+              </div>
+
+              <div class="alert alert-info">
+                  <span data-feather="info"></span> If one URL doesn't work, try the alternative URL.
+              </div>
+          </div>
+          <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              <a href="#" class="btn btn-primary" id="open-jupyter-btn" target="_blank">
+                  <span data-feather="external-link"></span> Open JupyterLab
+              </a>
+          </div>
+      </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+      const workspaceId = {{ workspace.id }};
+      let currentPath = '';
+      let currentFile = null;
+
+      // Initialize Socket.IO if available
+      const socket = typeof io !== 'undefined' ? io() : {
+          on: function() { console.warn('Socket.IO not available'); }
+      };
+
+      // Set up Socket.IO events
+      socket.on('git_commit', function(data) {
+          if (data.workspace_id === workspaceId) {
+              loadGitStatus();
+          }
+      });
+
+      socket.on('git_branch_created', function(data) {
+          if (data.workspace_id === workspaceId) {
+              loadGitStatus();
+          }
+      });
+
+      socket.on('git_branch_checkout', function(data) {
+          if (data.workspace_id === workspaceId) {
+              loadGitStatus();
+              loadFiles(currentPath);
+          }
+      });
+
+      // Load initial data
+      loadFiles('');
+      loadGitStatus();
+
+      // Add a back button handler
+      document.getElementById('back-button').addEventListener('click', function() {
+          // If we're already at the root, do nothing
+          if (currentPath === '') return;
+
+          // Get the parent path
+          const parts = currentPath.split('/');
+          parts.pop(); // Remove the last part
+          const parentPath = parts.join('/');
+
+          // Load the parent directory
+          loadFiles(parentPath);
+      });
+
+      // Ensure the root folder link works
+      document.getElementById('root-folder-link').addEventListener('click', function(e) {
+          e.preventDefault();
+          loadFiles('');
+      });
+
+      // Refresh files button
+      document.getElementById('refresh-files-btn').addEventListener('click', function() {
+          loadFiles(currentPath);
+      });
+
+      // Create folder button
+      document.getElementById('create-folder-btn').addEventListener('click', function() {
+          const modal = new bootstrap.Modal(document.getElementById('create-folder-modal'));
+          modal.show();
+      });
+
+      // Confirm create folder
+      document.getElementById('confirm-create-folder-btn').addEventListener('click', function() {
+          const folderName = document.getElementById('folder-name').value;
+          if (!folderName) return;
+
+          createFolder(currentPath, folderName);
+
+          // Close the modal
+          const modal = bootstrap.Modal.getInstance(document.getElementById('create-folder-modal'));
+          modal.hide();
+      });
+
+      // Create file button
+      document.getElementById('create-file-btn').addEventListener('click', function() {
+          const modal = new bootstrap.Modal(document.getElementById('create-file-modal'));
+          modal.show();
+      });
+
+      // Confirm create file
+      document.getElementById('confirm-create-file-btn').addEventListener('click', function() {
+          const fileName = document.getElementById('file-name').value;
+          if (!fileName) return;
+
+          createFile(currentPath, fileName);
+
+          // Close the modal
+          const modal = bootstrap.Modal.getInstance(document.getElementById('create-file-modal'));
+          modal.hide();
+      });
+
+      // Upload file button
+      document.getElementById('upload-file-btn').addEventListener('click', function() {
+          const modal = new bootstrap.Modal(document.getElementById('upload-file-modal'));
+          modal.show();
+      });
+
+      // Confirm upload file
+      document.getElementById('confirm-upload-file-btn').addEventListener('click', function() {
+          const fileInput = document.getElementById('file-upload');
+          if (!fileInput.files || fileInput.files.length === 0) return;
+
+          uploadFile(currentPath, fileInput.files[0]);
+
+          // Close the modal
+          const modal = bootstrap.Modal.getInstance(document.getElementById('upload-file-modal'));
+          modal.hide();
+      });
+
+      // Close editor button
+      document.getElementById('close-editor-btn').addEventListener('click', function() {
+          document.getElementById('file-editor-card').style.display = 'none';
+          currentFile = null;
+      });
+
+      // Close viewer button
+      document.getElementById('close-viewer-btn').addEventListener('click', function() {
+          document.getElementById('file-viewer-card').style.display = 'none';
+          currentFile = null;
+      });
+
+      // Save file button
+      document.getElementById('save-file-btn').addEventListener('click', function() {
+          if (!currentFile) return;
+
+          const content = document.getElementById('file-editor').value;
+          saveFile(currentFile, content);
+      });
+
+      // Create branch button
+      document.getElementById('create-branch-btn').addEventListener('click', function() {
+          const modal = new bootstrap.Modal(document.getElementById('create-branch-modal'));
+          modal.show();
+      });
+
+      // Confirm create branch
+      document.getElementById('confirm-create-branch-btn').addEventListener('click', function() {
+          const branchName = document.getElementById('branch-name').value;
+          if (!branchName) return;
+
+          createBranch(branchName);
+
+          // Close the modal
+          const modal = bootstrap.Modal.getInstance(document.getElementById('create-branch-modal'));
+          modal.hide();
+      });
+
+      // Force checkout button
+      document.getElementById('force-checkout-btn').addEventListener('click', function() {
+          const branchName = document.getElementById('checkout-branch-name').value;
+          if (!branchName) return;
+
+          checkoutBranch(branchName, true);
+
+          // Close the modal
+          const modal = bootstrap.Modal.getInstance(document.getElementById('checkout-modal'));
+          modal.hide();
+      });
+
+      // Commit before checkout button
+      document.getElementById('commit-before-checkout-btn').addEventListener('click', function() {
+          const branchName = document.getElementById('checkout-branch-name').value;
+          if (!branchName) return;
+
+          // Close the checkout modal
+          const checkoutModal = bootstrap.Modal.getInstance(document.getElementById('checkout-modal'));
+          checkoutModal.hide();
+
+          // Focus on the commit message input
+          document.getElementById('commit-message').focus();
+          document.getElementById('commit-message').value = 'Commit before switching to ' + branchName;
+
+          // Show a message
+          document.getElementById('commit-status').innerHTML = `
+              <div class="alert alert-info">
+                  Please commit your changes before switching to branch '${branchName}'.
+              </div>
+          `;
+      });
+
+      // Commit form
+      document.getElementById('commit-form').addEventListener('submit', function(e) {
+          e.preventDefault();
+
+          const commitBtn = document.getElementById('commit-btn');
+          const statusDiv = document.getElementById('commit-status');
+          const message = document.getElementById('commit-message').value;
+
+          commitBtn.disabled = true;
+          commitBtn.innerHTML = `
+              <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+              Committing...
+          `;
+
+          fetch(`/git/${workspaceId}/commit`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ message })
+          })
+          .then(response => {
+              if (!response.ok) {
+                  return response.json().then(data => {
+                      throw new Error(data.message || `HTTP error! Status: ${response.status}`);
+                  });
+              }
+              return response.json();
+          })
+          .then(data => {
+              commitBtn.disabled = false;
+              commitBtn.innerHTML = '<span data-feather="git-commit"></span> Commit & Push';
+              if (typeof feather !== 'undefined') {
+                  feather.replace();
+              }
+
+              if (data.success) {
+                  statusDiv.innerHTML = `
+                      <div class="alert alert-success">
+                          ${data.message}
+                      </div>
+                  `;
+                  document.getElementById('commit-message').value = '';
+                  loadGitStatus();
+              } else {
+                  statusDiv.innerHTML = `
+                      <div class="alert alert-danger">
+                          ${data.message}
+                      </div>
+                  `;
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              commitBtn.disabled = false;
+              commitBtn.innerHTML = '<span data-feather="git-commit"></span> Commit & Push';
+              if (typeof feather !== 'undefined') {
+                  feather.replace();
+              }
+
+              statusDiv.innerHTML = `
+                  <div class="alert alert-danger">
+                      An error occurred while committing changes: ${error.message}
+                  </div>
+              `;
+          });
+      });
+
+      // Launch JupyterLab button
+      document.getElementById('launch-jupyter-btn').addEventListener('click', function() {
+          const btn = this;
+
+          btn.disabled = true;
+          btn.innerHTML = `
+              <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+              Launching...
+          `;
+
+          fetch(`/ide/${workspaceId}/launch/jupyter`)
+              .then(response => {
+                  if (!response.ok) {
+                      return response.json().then(data => {
+                          throw new Error(data.message || 'Failed to launch JupyterLab');
+                      });
+                  }
+                  return response.json();
+              })
+              .then(data => {
+                  btn.disabled = false;
+                  btn.innerHTML = '<span data-feather="code"></span> Launch JupyterLab';
+                  if (typeof feather !== 'undefined') {
+                      feather.replace();
+                  }
+
+                  if (data.success) {
+                      // Simply redirect to the JupyterLab URL
+                      const url = data.url.split('\n')[0]; // Get the first URL
+                      window.location.href = url;
+                  } else {
+                      alert(`Failed to launch JupyterLab: ${data.message}`);
+                  }
+              })
+              .catch(error => {
+                  console.error('Error:', error);
+                  btn.disabled = false;
+                  btn.innerHTML = '<span data-feather="code"></span> Launch JupyterLab';
+                  if (typeof feather !== 'undefined') {
+                      feather.replace();
+                  }
+
+                  alert(`An error occurred while launching JupyterLab: ${error.message}`);
+              });
+      });
+
+      // Helper function to copy text to clipboard
+      function copyToClipboard(elementId) {
+          const element = document.getElementById(elementId);
+          element.select();
+          element.setSelectionRange(0, 99999); // For mobile devices
+
+          navigator.clipboard.writeText(element.value)
+              .then(() => {
+                  // Show a temporary tooltip or message
+                  alert('URL copied to clipboard!');
+              })
+              .catch(err => {
+                  console.error('Failed to copy text: ', err);
+                  alert('Failed to copy URL');
+              });
+      }
+
+      // Copy URL buttons
+      document.getElementById('copy-url-btn').addEventListener('click', function() {
+          copyToClipboard('jupyter-url', 'copy-status');
+      });
+
+      document.getElementById('copy-direct-url-btn').addEventListener('click', function() {
+          copyToClipboard('jupyter-direct-url');
+      });
+
+      // Function to copy text to clipboard
+      function copyToClipboard(elementId, statusElementId = null) {
+          const element = document.getElementById(elementId);
+          element.select();
+          element.setSelectionRange(0, 99999); // For mobile devices
+
+          navigator.clipboard.writeText(element.value)
+              .then(() => {
+                  if (statusElementId) {
+                      const statusElement = document.getElementById(statusElementId);
+                      statusElement.textContent = 'URL copied to clipboard!';
+                      statusElement.classList.add('text-success');
+
+                      // Clear the status message after 3 seconds
+                      setTimeout(() => {
+                          statusElement.textContent = '';
+                          statusElement.classList.remove('text-success');
+                      }, 3000);
+                  }
+              })
+              .catch(err => {
+                  console.error('Failed to copy text: ', err);
+                  if (statusElementId) {
+                      const statusElement = document.getElementById(statusElementId);
+                      statusElement.textContent = 'Failed to copy URL';
+                      statusElement.classList.add('text-danger');
+                  }
+              });
+      }
+
+      // Confirm delete button
+      document.getElementById('confirm-delete-btn').addEventListener('click', function() {
+          const path = document.getElementById('delete-path').value;
+          if (!path) return;
+
+          deleteItem(path);
+
+          // Close the modal
+          const modal = bootstrap.Modal.getInstance(document.getElementById('delete-modal'));
+          modal.hide();
+      });
+
+      // Confirm rename button
+      document.getElementById('confirm-rename-btn').addEventListener('click', function() {
+          const path = document.getElementById('rename-path').value;
+          const newName = document.getElementById('new-name').value;
+          if (!path || !newName) return;
+
+          renameItem(path, newName);
+
+          // Close the modal
+          const modal = bootstrap.Modal.getInstance(document.getElementById('rename-modal'));
+          modal.hide();
+      });
+
+      // Helper functions
+      // Update the loadFiles function to properly render the dropdown menus
+      function loadFiles(path) {
+          currentPath = path;
+
+          // Update breadcrumb
+          updateBreadcrumb(path);
+
+          const container = document.getElementById('files-container');
+          container.innerHTML = `
+              <div class="text-center">
+                  <div class="spinner-border" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                  </div>
+                  Loading files...
+              </div>
+          `;
+
+          fetch(`/files/${workspaceId}/list?path=${encodeURIComponent(path)}`)
+              .then(response => {
+                  if (!response.ok) {
+                      throw new Error(`HTTP error! Status: ${response.status}`);
+                  }
+                  return response.json();
+              })
+              .then(data => {
+                  if (data.success) {
+                      if (data.items.length === 0) {
+                          container.innerHTML = `
+                              <div class="alert alert-info">
+                                  This folder is empty.
+                              </div>
+                          `;
+                      } else {
+                          let html = `
+                              <div class="table-responsive">
+                                  <table class="table table-hover">
+                                      <thead>
+                                          <tr>
+                                              <th>Name</th>
+                                              <th>Type</th>
+                                              <th>Size</th>
+                                              <th>Actions</th>
+                                          </tr>
+                                      </thead>
+                                      <tbody>
+                          `;
+
+                          data.items.forEach(item => {
+                              const itemPath = item.path;
+                              const itemName = item.name;
+                              const itemType = item.type;
+                              const itemSize = formatSize(item.size);
+
+                              let icon = 'file';
+                              if (itemType === 'directory') {
+                                  icon = 'folder';
+                              } else if (item.extension === '.md') {
+                                  icon = 'file-text';
+                              } else if (['.jpg', '.jpeg', '.png', '.gif', '.svg'].includes(item.extension)) {
+                                  icon = 'image';
+                              } else if (['.js', '.ts', '.jsx', '.tsx'].includes(item.extension)) {
+                                  icon = 'code';
+                              } else if (['.py'].includes(item.extension)) {
+                                  icon = 'code';
+                              } else if (['.html', '.htm'].includes(item.extension)) {
+                                  icon = 'globe';
+                              } else if (['.css', '.scss', '.sass'].includes(item.extension)) {
+                                  icon = 'layout';
+                              } else if (['.json', '.yml', '.yaml', '.xml'].includes(item.extension)) {
+                                  icon = 'file-text';
+                              }
+
+                              html += `
+                                  <tr>
+                                      <td>
+                                          <a href="#" class="item-link" data-path="${itemPath}" data-type="${itemType}">
+                                              <span data-feather="${icon}"></span>
+                                              ${itemName}
+                                          </a>
+                                      </td>
+                                      <td>${itemType}</td>
+                                      <td>${itemSize}</td>
+                                      <td>
+                                          <div class="dropdown">
+                                              <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                  Actions
+                                              </button>
+                                              <ul class="dropdown-menu">
+                                                  <li><a class="dropdown-item item-link" href="#" data-path="${itemPath}" data-type="${itemType}">Open</a></li>
+                                                  <li><a class="dropdown-item rename-btn" href="#" data-path="${itemPath}" data-name="${itemName}">Rename</a></li>
+                                                  <li><a class="dropdown-item delete-btn" href="#" data-path="${itemPath}" data-name="${itemName}">Delete</a></li>
+                                                  ${itemType === 'directory' ?
+                                                      `<li><a class="dropdown-item download-folder-btn" href="#" data-path="${itemPath}">Download</a></li>` :
+                                                      `<li><a class="dropdown-item" href="/files/${workspaceId}/download?path=${encodeURIComponent(itemPath)}">Download</a></li>`}
+                                              </ul>
+                                          </div>
+                                      </td>
+                                  </tr>
+                              `;
+                          });
+
+                          html += `
+                                      </tbody>
+                                  </table>
+                              </div>
+                          `;
+
+                          container.innerHTML = html;
+
+                          // Initialize Feather icons
+                          if (typeof feather !== 'undefined') {
+                              feather.replace();
+                          }
+
+                          // Add event listeners to item links
+                          document.querySelectorAll('.item-link').forEach(link => {
+                              link.addEventListener('click', function(e) {
+                                  e.preventDefault();
+
+                                  const path = this.getAttribute('data-path');
+                                  const type = this.getAttribute('data-type');
+
+                                  if (type === 'directory') {
+                                      loadFiles(path);
+                                  } else {
+                                      openFile(path);
+                                  }
+                              });
+                          });
+
+                          // Add event listeners to rename buttons
+                          document.querySelectorAll('.rename-btn').forEach(btn => {
+                              btn.addEventListener('click', function(e) {
+                                  e.preventDefault();
+                                  const path = this.getAttribute('data-path');
+                                  const name = this.getAttribute('data-name');
+
+                                  document.getElementById('rename-path').value = path;
+                                  document.getElementById('new-name').value = name;
+
+                                  const modal = new bootstrap.Modal(document.getElementById('rename-modal'));
+                                  modal.show();
+                              });
+                          });
+
+                          // Add event listeners to delete buttons
+                          document.querySelectorAll('.delete-btn').forEach(btn => {
+                              btn.addEventListener('click', function(e) {
+                                  e.preventDefault();
+                                  const path = this.getAttribute('data-path');
+                                  const name = this.getAttribute('data-name');
+
+                                  document.getElementById('delete-path').value = path;
+                                  document.getElementById('delete-item-name').textContent = name;
+
+                                  const modal = new bootstrap.Modal(document.getElementById('delete-modal'));
+                                  modal.show();
+                              });
+                          });
+
+                          // Add event listeners to download folder buttons
+                          document.querySelectorAll('.download-folder-btn').forEach(btn => {
+                              btn.addEventListener('click', function(e) {
+                                  e.preventDefault();
+                                  const path = this.getAttribute('data-path');
+
+                                  // Redirect to the download folder endpoint
+                                  window.location.href = `/files/${workspaceId}/download-folder?path=${encodeURIComponent(path)}`;
+                              });
+                          });
+                      }
+                  } else {
+                      container.innerHTML = `
+                          <div class="alert alert-danger">
+                              ${data.message}
+                          </div>
+                      `;
+                  }
+              })
+              .catch(error => {
+                  console.error('Error:', error);
+                  container.innerHTML = `
+                      <div class="alert alert-danger">
+                          Failed to load files: ${error.message}
+                      </div>
+                  `;
+              });
+      }
+
+      function updateBreadcrumb(path) {
+          const breadcrumb = document.getElementById('path-breadcrumb');
+
+          // Clear existing items except the root
+          while (breadcrumb.children.length > 1) {
+              breadcrumb.removeChild(breadcrumb.lastChild);
+          }
+
+          if (!path) return;
+
+          const parts = path.split('/');
+          let currentPath = '';
+
+          parts.forEach((part, index) => {
+              if (!part) return;
+
+              currentPath += (currentPath ? '/' : '') + part;
+
+              const li = document.createElement('li');
+              li.className = 'breadcrumb-item';
+
+              if (index === parts.length - 1) {
+                  li.textContent = part;
+                  li.classList.add('active');
+                  li.setAttribute('aria-current', 'page');
+              } else {
+                  const a = document.createElement('a');
+                  a.href = '#';
+                  a.textContent = part;
+                  a.setAttribute('data-path', currentPath);
+                  a.addEventListener('click', function(e) {
+                      e.preventDefault();
+                      loadFiles(this.getAttribute('data-path'));
+                  });
+                  li.appendChild(a);
+              }
+
+              breadcrumb.appendChild(li);
+          });
+      }
+
+      function openFile(path) {
+          fetch(`/files/${workspaceId}/file?path=${encodeURIComponent(path)}`)
+              .then(response => {
+                  if (!response.ok) {
+                      throw new Error(`HTTP error! Status: ${response.status}`);
+                  }
+                  return response.json();
+              })
+              .then(data => {
+                  if (data.success) {
+                      currentFile = path;
+
+                      if (data.is_binary) {
+                          // For binary files, show the viewer
+                          document.getElementById('file-editor-card').style.display = 'none';
+                          document.getElementById('file-viewer-card').style.display = 'block';
+
+                          const filename = path.split('/').pop();
+                          document.getElementById('viewer-filename').textContent = filename;
+
+                          const downloadBtn = document.getElementById('download-file-btn');
+                          downloadBtn.href = data.download_url;
+
+                          const viewerContent = document.getElementById('file-viewer-content');
+
+                          if (data.mime_type.startsWith('image/')) {
+                              // For images, show an image preview
+                              viewerContent.innerHTML = `
+                                  <div class="text-center">
+                                      <img src="${data.download_url}" class="img-fluid" alt="${filename}">
+                                  </div>
+                              `;
+                          } else {
+                              // For other binary files, show a download link
+                              viewerContent.innerHTML = `
+                                  <div class="text-center">
+                                      <p>This file cannot be previewed in the browser.</p>
+                                      <a href="${data.download_url}" class="btn btn-primary">
+                                          <span data-feather="download"></span>
+                                          Download
+                                      </a>
+                                  </div>
+                              `;
+
+                              if (typeof feather !== 'undefined') {
+                                  feather.replace();
+                              }
+                          }
+                      } else {
+                          // For text files, show the editor
+                          document.getElementById('file-viewer-card').style.display = 'none';
+                          document.getElementById('file-editor-card').style.display = 'block';
+
+                          const filename = path.split('/').pop();
+                          document.getElementById('editor-filename').textContent = filename;
+
+                          const editor = document.getElementById('file-editor');
+                          editor.value = data.content;
+                      }
+                  } else {
+                      alert(`Failed to open file: ${data.message}`);
+                  }
+              })
+              .catch(error => {
+                  console.error('Error:', error);
+                  alert(`An error occurred while opening the file: ${error.message}`);
+              });
+      }
+
+      function saveFile(path, content) {
+          fetch(`/files/${workspaceId}/save`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ path, content })
+          })
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`HTTP error! Status: ${response.status}`);
+              }
+              return response.json();
+          })
+          .then(data => {
+              if (data.success) {
+                  alert('File saved successfully');
+              } else {
+                  alert(`Failed to save file: ${data.message}`);
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert(`An error occurred while saving the file: ${error.message}`);
+          });
+      }
+
+      // Fix the createFile function to handle files without extensions
+      function createFile(path, name) {
+          // Check if the file name is valid
+          if (!name || name.trim() === '') {
+              alert('Please enter a valid file name');
+              return;
+          }
+
+          // Create an empty file
+          saveFile(path ? `${path}/${name}` : name, '');
+
+          // Clear the input
+          document.getElementById('file-name').value = '';
+
+          // Reload the file list
+          setTimeout(() => {
+              loadFiles(currentPath);
+          }, 500);
+      }
+
+      function createFolder(path, name) {
+          fetch(`/files/${workspaceId}/create-folder`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ path, name })
+          })
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`HTTP error! Status: ${response.status}`);
+              }
+              return response.json();
+          })
+          .then(data => {
+              if (data.success) {
+                  document.getElementById('folder-name').value = '';
+                  loadFiles(currentPath);
+              } else {
+                  alert(`Failed to create folder: ${data.message}`);
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert(`An error occurred while creating the folder: ${error.message}`);
+          });
+      }
+
+      function uploadFile(path, file) {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('path', path);
+
+          fetch(`/files/${workspaceId}/upload`, {
+              method: 'POST',
+              body: formData
+          })
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`HTTP error! Status: ${response.status}`);
+              }
+              return response.json();
+          })
+          .then(data => {
+              if (data.success) {
+                  document.getElementById('file-upload').value = '';
+                  loadFiles(currentPath);
+              } else {
+                  alert(`Failed to upload file: ${data.message}`);
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert(`An error occurred while uploading the file: ${error.message}`);
+          });
+      }
+
+      function deleteItem(path) {
+          fetch(`/files/${workspaceId}/delete`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ path })
+          })
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`HTTP error! Status: ${response.status}`);
+              }
+              return response.json();
+          })
+          .then(data => {
+              if (data.success) {
+                  loadFiles(currentPath);
+              } else {
+                  alert(`Failed to delete item: ${data.message}`);
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert(`An error occurred while deleting the item: ${error.message}`);
+          });
+      }
+
+      function renameItem(path, newName) {
+          fetch(`/files/${workspaceId}/rename`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ path, new_name: newName })
+          })
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`HTTP error! Status: ${response.status}`);
+              }
+              return response.json();
+          })
+          .then(data => {
+              if (data.success) {
+                  loadFiles(currentPath);
+              } else {
+                  alert(`Failed to rename item: ${data.message}`);
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert(`An error occurred while renaming the item: ${error.message}`);
+          });
+      }
+
+      function loadGitStatus() {
+          const container = document.getElementById('git-status-container');
+          const currentBranchElement = document.getElementById('current-branch');
+          const branchList = document.getElementById('branch-list');
+
+          container.innerHTML = `
+              <div class="text-center">
+                  <div class="spinner-border spinner-border-sm" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                  </div>
+                  Loading Git status...
+              </div>
+          `;
+
+          fetch(`/git/${workspaceId}/status`)
+              .then(response => {
+                  if (!response.ok) {
+                      if (response.status === 404) {
+                          // Git not initialized
+                          container.innerHTML = `
+                              <div class="alert alert-warning">
+                                  Git repository is not initialized in this workspace.
+                                  <button class="btn btn-sm btn-primary mt-2" id="init-git-btn">
+                                      <span data-feather="git-branch"></span>
+                                      Initialize Git Repository
+                                  </button>
+                              </div>
+                          `;
+
+                          currentBranchElement.textContent = 'No Git';
+
+                          if (typeof feather !== 'undefined') {
+                              feather.replace();
+                          }
+
+                          document.getElementById('init-git-btn').addEventListener('click', function() {
+                              initGitRepository();
+                          });
+
+                          return;
+                      }
+                      throw new Error(`HTTP error! Status: ${response.status}`);
+                  }
+                  return response.json();
+              })
+              .then(data => {
+                  if (!data) return; // Response was handled above (404)
+
+                  if (data.success) {
+                      // Update current branch display
+                      currentBranchElement.textContent = data.current_branch || 'main';
+
+                      // Update branch list dropdown
+                      // Clear existing items except the "New Branch" option
+                      const createBranchItem = branchList.querySelector('#create-branch-btn').parentNode;
+                      const divider = branchList.querySelector('hr').parentNode;
+
+                      while (branchList.children.length > 2) {
+                          branchList.removeChild(branchList.lastChild);
+                      }
+
+                      // Add branches to dropdown
+                      data.branches.forEach(branch => {
+                          const li = document.createElement('li');
+                          const a = document.createElement('a');
+                          a.className = 'dropdown-item branch-item';
+                          a.href = '#';
+                          a.textContent = branch;
+                          a.setAttribute('data-branch', branch);
+
+                          if (branch === data.current_branch) {
+                              a.className += ' active';
+                              a.innerHTML = `<span data-feather="check"></span> ${branch}`;
+                          }
+
+                          a.addEventListener('click', function(e) {
+                              e.preventDefault();
+                              const branchName = this.getAttribute('data-branch');
+                              if (branchName !== data.current_branch) {
+                                  checkoutBranch(branchName);
+                              }
+                          });
+
+                          li.appendChild(a);
+                          branchList.appendChild(li);
+                      });
+
+                      if (typeof feather !== 'undefined') {
+                          feather.replace();
+                      }
+
+                      // Display changes
+                      if (data.changes.length === 0) {
+                          container.innerHTML = `
+                              <div class="alert alert-info">
+                                  No changes detected. Working directory is clean.
+                              </div>
+                          `;
+                      } else {
+                          let html = `
+                              <div class="alert alert-warning">
+                                  <strong>${data.changes.length} changes detected:</strong>
+                              </div>
+                              <div class="list-group list-group-flush mb-3">
+                          `;
+
+                          data.changes.forEach(change => {
+                              let statusClass = 'secondary';
+                              if (change.status.includes('M')) {
+                                  statusClass = 'warning';
+                              } else if (change.status.includes('A')) {
+                                  statusClass = 'success';
+                              } else if (change.status.includes('D')) {
+                                  statusClass = 'danger';
+                              }
+
+                              html += `
+                                  <div class="list-group-item p-2 d-flex align-items-center">
+                                      <span class="badge bg-${statusClass} me-2">${change.status}</span>
+                                      <small class="text-truncate">${change.filename}</small>
+                                  </div>
+                              `;
+                          });
+
+                          html += `
+                              </div>
+                          `;
+
+                          container.innerHTML = html;
+                      }
+                  } else {
+                      container.innerHTML = `
+                          <div class="alert alert-danger">
+                              ${data.message || 'Failed to load Git status'}
+                          </div>
+                      `;
+                  }
+              })
+              .catch(error => {
+                  console.error('Error:', error);
+                  container.innerHTML = `
+                      <div class="alert alert-danger">
+                          Failed to load Git status: ${error.message}
+                      </div>
+                  `;
+              });
+      }
+
+      function initGitRepository() {
+          const container = document.getElementById('git-status-container');
+
+          container.innerHTML = `
+              <div class="alert alert-info">
+                  <div class="d-flex align-items-center">
+                      <div class="spinner-border spinner-border-sm me-2" role="status">
+                          <span class="visually-hidden">Initializing...</span>
+                      </div>
+                      Initializing Git repository...
+                  </div>
+              </div>
+          `;
+
+          fetch(`/git/${workspaceId}/init`, {
+              method: 'POST'
+          })
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`HTTP error! Status: ${response.status}`);
+              }
+              return response.json();
+          })
+          .then(data => {
+              if (data.success) {
+                  container.innerHTML = `
+                      <div class="alert alert-success">
+                          Git repository initialized successfully.
+                      </div>
+                  `;
+
+                  // Reload Git status after a short delay
+                  setTimeout(() => {
+                      loadGitStatus();
+                  }, 1000);
+              } else {
+                  container.innerHTML = `
+                      <div class="alert alert-danger">
+                          ${data.message}
+                      </div>
+                  `;
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              container.innerHTML = `
+                  <div class="alert alert-danger">
+                      Failed to initialize Git repository: ${error.message}
+                  </div>
+              `;
+          });
+      }
+
+      function createBranch(branchName) {
+          fetch(`/git/${workspaceId}/branch`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ branch_name: branchName })
+          })
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`HTTP error! Status: ${response.status}`);
+              }
+              return response.json();
+          })
+          .then(data => {
+              if (data.success) {
+                  document.getElementById('branch-name').value = '';
+                  loadGitStatus();
+
+                  // Show success message
+                  document.getElementById('commit-status').innerHTML = `
+                      <div class="alert alert-success">
+                          ${data.message}
+                      </div>
+                  `;
+              } else {
+                  alert(`Failed to create branch: ${data.message}`);
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert(`An error occurred while creating the branch: ${error.message}`);
+          });
+      }
+
+      function checkoutBranch(branchName, force = false) {
+          fetch(`/git/${workspaceId}/checkout`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ branch_name: branchName, force: force })
+          })
+          .then(response => {
+              if (!response.ok) {
+                  return response.json().then(data => {
+                      if (data.has_changes && !force) {
+                          // Show confirmation modal
+                          document.getElementById('checkout-branch-name').value = branchName;
+                          const modal = new bootstrap.Modal(document.getElementById('checkout-modal'));
+                          modal.show();
+                          return { handled: true };
+                      }
+                      throw new Error(data.message || `HTTP error! Status: ${response.status}`);
+                  });
+              }
+              return response.json();
+          })
+          .then(data => {
+              if (data.handled) return;
+
+              if (data.success) {
+                  loadGitStatus();
+                  loadFiles(currentPath);
+
+                  // Show success message
+                  document.getElementById('commit-status').innerHTML = `
+                      <div class="alert alert-success">
+                          ${data.message}
+                      </div>
+                  `;
+              } else {
+                  alert(`Failed to checkout branch: ${data.message}`);
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert(`An error occurred while checking out the branch: ${error.message}`);
+          });
+      }
+
+      function formatSize(bytes) {
+          if (bytes === 0) return '0 Bytes';
+
+          const k = 1024;
+          const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+          const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+          return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      }
+
+      // Make sure the JupyterLab URL modal is properly initialized
+      console.log("Checking if JupyterLab URL modal exists:", !!document.getElementById('jupyter-url-modal'));
+      if (document.getElementById('jupyter-url-modal')) {
+          // Test modal functionality
+          document.getElementById('test-jupyter-modal-btn') && document.getElementById('test-jupyter-modal-btn').addEventListener('click', function() {
+              console.log("Test modal button clicked");
+              const jupyterModal = new bootstrap.Modal(document.getElementById('jupyter-url-modal'));
+              jupyterModal.show();
+          });
+      }
+  });
+</script>
+{% endblock %}

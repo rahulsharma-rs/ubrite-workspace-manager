@@ -1,0 +1,34 @@
+name: scientific-computing
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - numpy
+  - scipy
+  - sympy
+  - matplotlib
+  - pandas
+  - jupyter
+  - jupyterlab
+  - ipywidgets
+  - numba
+  - dask
+  - h5py
+  - pytables
+  - fenics
+  - petsc
+  - slepc
+  - mpi4py
+  - cython
+  - pip
+  - pip:
+    - dedalus
+    - fipy
+    - pyfftw
+    - meshio
+    - pygmsh
+    - dolfinx
+    - ufl
+    - ffmpeg
+    - pyvista

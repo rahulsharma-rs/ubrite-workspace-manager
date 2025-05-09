@@ -1,0 +1,130 @@
+/* Main styles */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.5;
+  color: #212529;
+}
+
+/* Sidebar styles */
+.sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 100;
+  padding: 48px 0 0;
+  box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-sticky {
+  position: relative;
+  top: 0;
+  height: calc(100vh - 48px);
+  padding-top: .5rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.sidebar .nav-link {
+  font-weight: 500;
+  color: #333;
+  padding: .5rem 1rem;
+}
+
+.sidebar .nav-link.active {
+  color: #0d6efd;
+}
+
+.sidebar .nav-link:hover {
+  color: #0d6efd;
+}
+
+.sidebar-heading {
+  font-size: .75rem;
+  text-transform: uppercase;
+}
+
+.sidebar-header {
+  padding: 0 1rem;
+}
+
+/* Card styles */
+.card {
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  margin-bottom: 1.5rem;
+}
+
+/* Table styles */
+.table-responsive {
+  margin-bottom: 1rem;
+}
+
+/* Form styles */
+.form-control:focus,
+.form-select:focus {
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Button styles */
+.btn-primary {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+
+.btn-primary:hover {
+  background-color: #0b5ed7;
+  border-color: #0a58ca;
+}
+
+/* Alert styles */
+.alert {
+  margin-bottom: 1rem;
+}
+
+/* Code styles */
+pre {
+  background-color: #f8f9fa;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+code {
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.875em;
+}
+
+/* Tab styles */
+.nav-tabs .nav-link {
+  color: #495057;
+}
+
+.nav-tabs .nav-link.active {
+  color: #0d6efd;
+  font-weight: 500;
+}
+
+/* Spinner styles */
+.spinner-border {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 767.98px) {
+  .sidebar {
+    position: static;
+    height: auto;
+    padding-top: 0;
+  }
+
+  .sidebar-sticky {
+    height: auto;
+  }
+
+  main {
+    padding-top: 1rem;
+  }
+}

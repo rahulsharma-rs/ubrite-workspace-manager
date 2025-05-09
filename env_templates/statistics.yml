@@ -1,0 +1,33 @@
+name: statistics
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - numpy
+  - scipy
+  - pandas
+  - matplotlib
+  - seaborn
+  - statsmodels
+  - patsy
+  - scikit-learn
+  - jupyter
+  - jupyterlab
+  - ipywidgets
+  - r-base
+  - r-essentials
+  - r-tidyverse
+  - r-ggplot2
+  - r-dplyr
+  - r-rmarkdown
+  - r-irkernel
+  - pip
+  - pip:
+    - pingouin
+    - researchpy
+    - lifelines
+    - pymc3
+    - arviz
+    - bambi
+    - prophet

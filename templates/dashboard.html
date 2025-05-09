@@ -1,0 +1,868 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - UBRITE{% endblock %}
+
+{% block header %}Dashboard{% endblock %}
+
+{% block header_buttons %}
+<a href="{{ url_for('workspaces.create_workspace') }}" class="btn btn-sm btn-primary">
+    <span data-feather="plus"></span>
+    Create Workspace
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Welcome to UBRITE Project Workspace Manager</h5>
+                <p class="card-text">
+                    UBRITE helps you create and manage research workspaces with integrated Conda environments,
+                    GitLab repositories, and in-browser IDEs.
+                </p>
+                <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+                    <a href="{{ url_for('workspaces.create_workspace') }}" class="btn btn-primary">
+                        Create Workspace
+                    </a>
+                    <a href="{{ url_for('workspaces.list_workspaces') }}" class="btn btn-outline-secondary">
+                        View Workspaces
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Environment Templates Section -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Available Python Virtual Environment Templates</h5>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#templateCollapse" aria-expanded="false" aria-controls="templateCollapse">
+                    Show/Hide
+                </button>
+            </div>
+            <div class="collapse" id="templateCollapse">
+                <div class="card-body">
+                    <div class="row row-cols-1 row-cols-md-3 g-3" id="template-cards">
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Python Environments Section -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Detected Python Environments</h5>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#pythonEnvsCollapse" aria-expanded="false" aria-controls="pythonEnvsCollapse">
+                    Show/Hide
+                </button>
+            </div>
+            <div class="collapse" id="pythonEnvsCollapse">
+                <div class="card-body">
+                    <div id="python-envs-container">
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Configuration Section -->
+<h2 class="mt-5 mb-4">Configuration</h2>
+
+<!-- GitLab Configuration -->
+<div class="row mb-4" id="gitlab-config">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">GitLab Configuration</h5>
+                <div>
+                    <button id="debug-gitlab-btn" class="btn btn-sm btn-outline-secondary me-2">
+                        Debug
+                    </button>
+                    <button id="test-gitlab-btn" class="btn btn-sm btn-outline-secondary">
+                        Test Connection
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="gitlab-status" class="mb-3"></div>
+                <form id="settings-form">
+                    <div class="mb-3">
+                        <label for="gitlab-pat" class="form-label">GitLab Personal Access Token</label>
+                        <input type="password" class="form-control" id="gitlab-pat" name="gitlab_pat">
+                        <div class="form-text">
+                            Required for GitLab repository creation. Create a token with <code>api</code> scope.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="gitlab-url" class="form-label">GitLab URL (Optional)</label>
+                        <input type="text" class="form-control" id="gitlab-url" name="gitlab_url" placeholder="https://gitlab.com">
+                        <div class="form-text">
+                            Leave empty to use the default GitLab.com
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Configuration</button>
+                </form>
+                <div id="settings-status" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Conda Configuration -->
+<div class="row mb-4" id="conda-config">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Conda Configuration</h5>
+            </div>
+            <div class="card-body">
+                <div id="conda-status" class="mb-3">
+                    <div class="spinner-border spinner-border-sm" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    Checking Conda availability...
+                </div>
+
+                <form id="conda-form">
+                    <div class="mb-3">
+                        <label for="conda-path" class="form-label">Conda Path</label>
+                        <input type="text" class="form-control" id="conda-path" name="conda_path" placeholder="/path/to/conda">
+                        <div class="form-text">
+                            Full path to the conda executable. Leave empty to use the default 'conda' command.
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Conda Path</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JupyterLab Configuration -->
+<div class="row mb-4" id="jupyter-config">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">JupyterLab Configuration</h5>
+            </div>
+            <div class="card-body">
+                <div id="jupyter-status" class="mb-3">
+                    <div class="spinner-border spinner-border-sm" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    Checking JupyterLab availability...
+                </div>
+
+                <form id="jupyter-form">
+                    <div class="mb-3">
+                        <label for="jupyter-path" class="form-label">JupyterLab Path</label>
+                        <input type="text" class="form-control" id="jupyter-path" name="jupyter_path" placeholder="/path/to/jupyter">
+                        <div class="form-text">
+                            Full path to the jupyter executable. Leave empty to use the default 'jupyter' command.
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save JupyterLab Path</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Application Status -->
+<div class="row mb-4" id="app-status-section">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Application Status</h5>
+            </div>
+            <div class="card-body">
+                <div id="app-status">Loading...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if GitLab PAT is set
+        fetch('/settings')
+            .then(response => response.json())
+            .then(data => {
+                const statusDiv = document.getElementById('settings-status');
+                if (data.has_gitlab_pat) {
+                    statusDiv.innerHTML = '<div class="alert alert-success">GitLab PAT is configured</div>';
+                    testGitLabConnection();
+                } else {
+                    statusDiv.innerHTML = '<div class="alert alert-warning">GitLab PAT is not configured</div>';
+                    document.getElementById('gitlab-status').innerHTML = '<div class="alert alert-warning">GitLab connection not configured</div>';
+                }
+
+                // Populate GitLab URL if available
+                if (data.gitlab_url) {
+                    document.getElementById('gitlab-url').value = data.gitlab_url;
+                }
+            });
+
+        // Check Conda availability
+        fetch('/workspaces/check-conda')
+            .then(response => response.json())
+            .then(data => {
+                const statusDiv = document.getElementById('conda-status');
+
+                if (data.available) {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <strong>Conda is available</strong><br>
+                            Path: ${data.path}
+                        </div>
+                    `;
+                    document.getElementById('conda-path').value = data.path;
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-warning">
+                            <strong>Conda is not available</strong><br>
+                            Please install Conda or configure the correct path.
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const statusDiv = document.getElementById('conda-status');
+                statusDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        Failed to check Conda availability.
+                    </div>
+                `;
+            });
+
+        // Check JupyterLab availability
+        fetch('/ide/check-jupyter')
+            .then(response => response.json())
+            .then(data => {
+                const statusDiv = document.getElementById('jupyter-status');
+
+                if (data.success) {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <strong>JupyterLab is available</strong><br>
+                            ${data.message}
+                        </div>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-warning">
+                            <strong>JupyterLab is not available</strong><br>
+                            ${data.message}
+                        </div>
+                        <div class="mt-2">
+                            <p>To install JupyterLab:</p>
+                            <pre><code>pip install jupyterlab</code></pre>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const statusDiv = document.getElementById('jupyter-status');
+                statusDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        Failed to check JupyterLab availability.
+                    </div>
+                `;
+            });
+
+
+        // Load Python environments
+        fetch('/workspaces/python-environments')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('python-envs-container');
+
+                if (!data.environments || data.environments.length === 0) {
+                    container.innerHTML = '<div class="alert alert-info">No Python environments detected.</div>';
+                    return;
+                }
+
+                // Group environments by type
+                const grouped = {
+                    'system': [],
+                    'conda': [],
+                    'venv': []
+                };
+
+                data.environments.forEach(env => {
+                    if (grouped[env.type]) {
+                        grouped[env.type].push(env);
+                    } else {
+                        grouped.other = grouped.other || [];
+                        grouped.other.push(env);
+                    }
+                });
+
+                let html = '';
+
+                // System Python
+                if (grouped.system && grouped.system.length > 0) {
+                    html += `
+                        <h6>System Python</h6>
+                        <div class="table-responsive mb-4">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Version</th>
+                                        <th>Path</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    grouped.system.forEach(env => {
+                        html += `
+                            <tr>
+                                <td>${env.version}</td>
+                                <td><code>${env.path}</code></td>
+                            </tr>
+                        `;
+                    });
+
+                    html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                }
+
+                // Conda environments
+                if (grouped.conda && grouped.conda.length > 0) {
+                    html += `
+                        <h6>Conda Environments</h6>
+                        <div class="table-responsive mb-4">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Version</th>
+                                        <th>Path</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    grouped.conda.forEach(env => {
+                        html += `
+                            <tr>
+                                <td>${env.name}</td>
+                                <td>${env.version}</td>
+                                <td><code>${env.path}</code></td>
+                            </tr>
+                        `;
+                    });
+
+                    html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                }
+
+                // Virtual environments
+                if (grouped.venv && grouped.venv.length > 0) {
+                    html += `
+                        <h6>Virtual Environments</h6>
+                        <div class="table-responsive mb-4">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Version</th>
+                                        <th>Path</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    grouped.venv.forEach(env => {
+                        html += `
+                            <tr>
+                                <td>${env.name}</td>
+                                <td>${env.version}</td>
+                                <td><code>${env.path}</code></td>
+                                <td>${env.status === 'active' ? '<span class="badge bg-success">Active</span>' : ''}</td>
+                            </tr>
+                        `;
+                    });
+
+                    html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                }
+
+                // Other environments
+                if (grouped.other && grouped.other.length > 0) {
+                    html += `
+                        <h6>Other Environments</h6>
+                        <div class="table-responsive mb-4">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Type</th>
+                                        <th>Version</th>
+                                        <th>Path</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    grouped.other.forEach(env => {
+                        html += `
+                            <tr>
+                                <td>${env.name}</td>
+                                <td>${env.type}</td>
+                                <td>${env.version}</td>
+                                <td><code>${env.path}</code></td>
+                            </tr>
+                        `;
+                    });
+
+                    html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const container = document.getElementById('python-envs-container');
+                container.innerHTML = '<div class="alert alert-danger">Failed to load Python environments.</div>';
+            });
+
+        // Load environment templates
+        fetch('/env-templates')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('template-cards');
+
+                if (data.templates.length === 0) {
+                    container.innerHTML = '<div class="col-12"><p>No environment templates found.</p></div>';
+                    return;
+                }
+
+                // Template descriptions
+                const descriptions = {
+                    'data-science': 'General data science packages (numpy, pandas, matplotlib, scikit-learn)',
+                    'web-dev': 'Web development packages (Flask, SQLAlchemy, etc.)',
+                    'deep-learning': 'Deep learning frameworks and tools (PyTorch, TensorFlow, transformers)',
+                    'bioinformatics': 'Bioinformatics tools and libraries (Biopython, BLAST, samtools)',
+                    'nlp': 'Natural Language Processing libraries (NLTK, spaCy, transformers)',
+                    'computer-vision': 'Computer Vision libraries (OpenCV, torchvision, detectron2)',
+                    'geospatial': 'Geospatial analysis tools (GeoPandas, GDAL, rasterio)',
+                    'scientific-computing': 'Scientific computing and simulation (FEniCS, PETSc, Numba)',
+                    'statistics': 'Statistical analysis packages (statsmodels, PyMC3, R integration)'
+                };
+
+                // Icons for templates
+                const icons = {
+                    'data-science': '📊',
+                    'web-dev': '🌐',
+                    'deep-learning': '🧠',
+                    'bioinformatics': '🧬',
+                    'nlp': '📝',
+                    'computer-vision': '👁️',
+                    'geospatial': '🌍',
+                    'scientific-computing': '🔬',
+                    'statistics': '📈'
+                };
+
+                let html = '';
+
+                data.templates.forEach(template => {
+                    const description = descriptions[template] || 'Custom environment template';
+                    const icon = icons[template] || '📦';
+
+                    html += `
+                        <div class="col">
+                            <div class="card h-100">
+                                <div class="card-body p-3">
+                                    <h6 class="card-title">${icon} ${template}</h6>
+                                    <p class="card-text small">${description}</p>
+                                    <a href="/workspaces/create?template=${template}" class="btn btn-sm btn-outline-primary">
+                                        Use
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const container = document.getElementById('template-cards');
+                container.innerHTML = '<div class="col-12"><p>Failed to load environment templates.</p></div>';
+            });
+
+        // Check application status
+        fetch('/app-status')
+            .then(response => response.json())
+            .then(data => {
+                const statusDiv = document.getElementById('app-status');
+                let html = '<ul class="list-group">';
+
+                // Directory status
+                html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    UBRITE Root Directory
+                    <span class="badge ${data.directories.ubrite_root ? 'bg-success' : 'bg-danger'} rounded-pill">
+                        ${data.directories.ubrite_root ? 'OK' : 'Missing'}
+                    </span>
+                </li>`;
+
+                html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    Database Directory
+                    <span class="badge ${data.directories.db_root ? 'bg-success' : 'bg-danger'} rounded-pill">
+                        ${data.directories.db_root ? 'OK' : 'Missing'}
+                    </span>
+                </li>`;
+
+                html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    Temp Directory
+                    <span class="badge ${data.directories.temp_root ? 'bg-success' : 'bg-danger'} rounded-pill">
+                        ${data.directories.temp_root ? 'OK' : 'Missing'}
+                    </span>
+                </li>`;
+
+                // Database status
+                html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    Database Connection
+                    <span class="badge ${data.database ? 'bg-success' : 'bg-danger'} rounded-pill">
+                        ${data.database ? 'Connected' : 'Error'}
+                    </span>
+                </li>`;
+
+                // GitLab status
+                html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    GitLab Connection
+                    <span class="badge ${data.gitlab.success ? 'bg-success' : 'bg-danger'} rounded-pill">
+                        ${data.gitlab.success ? 'Connected' : 'Error'}
+                    </span>
+                </li>`;
+
+                // Conda status
+                if (data.conda) {
+                    html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                        Conda
+                        <span class="badge ${data.conda.available ? 'bg-success' : 'bg-warning'} rounded-pill">
+                            ${data.conda.available ? 'Available' : 'Not Found'}
+                        </span>
+                    </li>`;
+                }
+
+                // JupyterLab status
+                if (data.jupyter) {
+                    html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                        JupyterLab
+                        <span class="badge ${data.jupyter.available ? 'bg-success' : 'bg-warning'} rounded-pill">
+                            ${data.jupyter.available ? 'Available' : 'Not Found'}
+                        </span>
+                    </li>`;
+                }
+
+
+                html += '</ul>';
+                statusDiv.innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const statusDiv = document.getElementById('app-status');
+                statusDiv.innerHTML = '<div class="alert alert-danger">Failed to load application status.</div>';
+            });
+
+        // Handle settings form submission
+        const settingsForm = document.getElementById('settings-form');
+        settingsForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(settingsForm);
+
+            fetch('/settings', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const statusDiv = document.getElementById('settings-status');
+                if (data.success) {
+                    statusDiv.innerHTML = '<div class="alert alert-success">Settings saved successfully</div>';
+                    document.getElementById('gitlab-pat').value = '';
+                    testGitLabConnection();
+                } else {
+                    statusDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const statusDiv = document.getElementById('settings-status');
+                statusDiv.innerHTML = '<div class="alert alert-danger">An error occurred</div>';
+            });
+        });
+
+        // Handle conda form submission
+        const condaForm = document.getElementById('conda-form');
+        condaForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const condaPath = document.getElementById('conda-path').value;
+            const statusDiv = document.getElementById('conda-status');
+
+            statusDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                            <span class="visually-hidden">Saving...</span>
+                        </div>
+                        Saving Conda path...
+                    </div>
+                </div>
+            `;
+
+            fetch('/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ conda_path: condaPath })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    statusDiv.innerHTML = '<div class="alert alert-success">Conda path saved successfully</div>';
+
+                    // Check if conda is available with the new path
+                    fetch('/workspaces/check-conda')
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.available) {
+                                statusDiv.innerHTML = `
+                                    <div class="alert alert-success">
+                                        <strong>Conda is available</strong><br>
+                                        Path: ${data.path}
+                                    </div>
+                                `;
+                            } else {
+                                statusDiv.innerHTML = `
+                                    <div class="alert alert-warning">
+                                        <strong>Conda is not available</strong><br>
+                                        The specified path does not point to a valid conda executable.
+                                    </div>
+                                `;
+                            }
+                        });
+                } else {
+                    statusDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusDiv.innerHTML = '<div class="alert alert-danger">An error occurred</div>';
+            });
+        });
+
+        // Handle JupyterLab form submission
+        const jupyterForm = document.getElementById('jupyter-form');
+        jupyterForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const jupyterPath = document.getElementById('jupyter-path').value;
+            const statusDiv = document.getElementById('jupyter-status');
+
+            statusDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                            <span class="visually-hidden">Saving...</span>
+                        </div>
+                        Saving JupyterLab path...
+                    </div>
+                </div>
+            `;
+
+            fetch('/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ jupyter_path: jupyterPath })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    statusDiv.innerHTML = '<div class="alert alert-success">JupyterLab path saved successfully</div>';
+
+                    // Check if JupyterLab is available with the new path
+                    fetch('/ide/check-jupyter')
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                statusDiv.innerHTML = `
+                                    <div class="alert alert-success">
+                                        <strong>JupyterLab is available</strong><br>
+                                        ${data.message}
+                                    </div>
+                                `;
+                            } else {
+                                statusDiv.innerHTML = `
+                                    <div class="alert alert-warning">
+                                        <strong>JupyterLab is not available</strong><br>
+                                        ${data.message}
+                                    </div>
+                                    <div class="mt-2">
+                                        <p>To install JupyterLab:</p>
+                                        <pre><code>pip install jupyterlab</code></pre>
+                                    </div>
+                                `;
+                            }
+                        });
+                } else {
+                    statusDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusDiv.innerHTML = '<div class="alert alert-danger">An error occurred</div>';
+            });
+        });
+
+        // Test GitLab connection
+        document.getElementById('test-gitlab-btn').addEventListener('click', function() {
+            testGitLabConnection();
+        });
+
+        function testGitLabConnection() {
+            const statusDiv = document.getElementById('gitlab-status');
+            statusDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                            <span class="visually-hidden">Testing...</span>
+                        </div>
+                        Testing GitLab connection...
+                    </div>
+                </div>
+            `;
+
+            fetch('/test-gitlab')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        statusDiv.innerHTML = `
+                            <div class="alert alert-success">
+                                <strong>Connected to GitLab</strong><br>
+                                ${data.details}
+                            </div>
+                        `;
+                    } else {
+                        statusDiv.innerHTML = `
+                            <div class="alert alert-danger">
+                                <strong>${data.message}</strong><br>
+                                ${data.details}
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    statusDiv.innerHTML = '<div class="alert alert-danger">Failed to test GitLab connection</div>';
+                });
+        }
+
+        // Debug GitLab connection
+        document.getElementById('debug-gitlab-btn').addEventListener('click', function() {
+            const statusDiv = document.getElementById('gitlab-status');
+            statusDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                            <span class="visually-hidden">Debugging...</span>
+                        </div>
+                        Debugging GitLab connection...
+                    </div>
+                </div>
+            `;
+
+            fetch('/debug-gitlab')
+                .then(response => response.json())
+                .then(data => {
+                    let debugInfo = `
+                        <div class="alert alert-info">
+                            <h5>GitLab Debug Information</h5>
+                            <p><strong>GitLab URL:</strong> ${data.gitlab_url}</p>
+                            <p><strong>PAT Configured:</strong> ${data.has_pat ? 'Yes' : 'No'}</p>
+                    `;
+
+                    if (data.direct_request) {
+                        if (data.direct_request.error) {
+                            debugInfo += `
+                                <p><strong>Direct Request Error:</strong> ${data.direct_request.error}</p>
+                            `;
+                        } else {
+                            debugInfo += `
+                                <p><strong>Status Code:</strong> ${data.direct_request.status_code}</p>
+                                <p><strong>Content Type:</strong> ${data.direct_request.content_type}</p>
+                                <p><strong>Content Length:</strong> ${data.direct_request.content_length}</p>
+                                <p><strong>Content Preview:</strong> <code>${data.direct_request.content_preview}</code></p>
+                            `;
+                        }
+                    }
+
+                    debugInfo += `
+                        <p class="mt-3">
+                            <strong>Troubleshooting Tips:</strong>
+                            <ul>
+                                <li>Make sure the GitLab URL is correct and accessible</li>
+                                <li>Check if your network allows connections to this URL</li>
+                                <li>Verify that your Personal Access Token has the correct permissions</li>
+                                <li>Try using a different browser or network connection</li>
+                            </ul>
+                        </p>
+                    </div>
+                    `;
+
+                    statusDiv.innerHTML = debugInfo;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    statusDiv.innerHTML = '<div class="alert alert-danger">Failed to debug GitLab connection</div>';
+                });
+        });
+    });
+</script>
+{% endblock %}
