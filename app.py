@@ -111,7 +111,7 @@ def create_app(config_name=None):
     def health_check():
         return jsonify({'status': 'healthy', 'timestamp': str(datetime.utcnow())})
 
-    # Add app status endpoint (existing functionality)
+    # Add app status endpoint - use the dashboard blueprint's implementation
     @app.route('/app-status')
     def app_status():
         try:
@@ -119,6 +119,7 @@ def create_app(config_name=None):
             status = get_app_status()
             return jsonify(status)
         except Exception as e:
+            app.logger.error(f"Error getting app status: {str(e)}")
             return jsonify({'error': True, 'message': str(e)}), 500
 
     # Error handlers with CORS support

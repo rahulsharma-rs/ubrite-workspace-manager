@@ -1,134 +1,68 @@
-from flask import Blueprint, render_template, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app
 from models import Workspace
-from extensions import db, socketio
+from services.git_config_service import GitConfigService
 from services.gitlab_service import GitLabService
 from utils.filesystem import log_event
-from services.analytics_service import AnalyticsService
-import subprocess
 import os
+import subprocess
 import logging
-from services.git_config_service import GitConfigService
 
 git_bp = Blueprint('git', __name__)
-analytics_service = AnalyticsService()
 logger = logging.getLogger(__name__)
 
 
-@git_bp.route('/<int:workspace_id>/init', methods=['POST'])
-def git_init(workspace_id):
-    """Initialize a Git repository in a workspace."""
+def get_analytics_service():
+    """Get analytics service instance."""
     try:
-        workspace = Workspace.query.get_or_404(workspace_id)
-        git_config_service = GitConfigService()
-
-        # Check if workspace path exists
-        if not os.path.exists(workspace.path):
-            logger.error(f"Workspace path does not exist: {workspace.path}")
-            return jsonify({
-                'success': False,
-                'message': f"Workspace path does not exist: {workspace.path}"
-            }), 404
-
-        # Check if .git directory already exists
-        git_dir = os.path.join(workspace.path, '.git')
-        if os.path.exists(git_dir):
-            logger.warning(f"Git repository already exists in workspace: {workspace.path}")
-            return jsonify({
-                'success': False,
-                'message': "Git repository already exists in this workspace"
-            }), 400
-
-        try:
-            # Initialize Git repository
-            init_result = subprocess.run(
-                ['git', 'init'],
-                cwd=workspace.path,
-                capture_output=True,
-                text=True,
-                check=True
-            )
-
-            # Apply git configuration to the repository
-            git_config_service.apply_git_config_to_repository(workspace.path)
-
-            # Create initial commit
-            with open(os.path.join(workspace.path, 'README.md'), 'w') as f:
-                f.write(f"# {workspace.name}\n\nWorkspace created with UBRITE Workspace Manager.\n")
-
-            # Stage README.md
-            subprocess.run(
-                ['git', 'add', 'README.md'],
-                cwd=workspace.path,
-                check=True
-            )
-
-            # Create initial commit
-            commit_result = subprocess.run(
-                ['git', 'commit', '-m', 'Initial commit'],
-                cwd=workspace.path,
-                capture_output=True,
-                text=True,
-                check=True
-            )
-
-            # Log the event
-            log_event(workspace.id, 'git_initialized', {
-                'message': 'Git repository initialized with configuration'
-            })
-
-            # Track analytics
-            analytics_service.track_event('git_initialized', {
-                'ws_id': workspace.id
-            })
-
-            return jsonify({
-                'success': True,
-                'message': 'Git repository initialized successfully with user configuration'
-            })
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Git init command failed: {e.stderr}")
-            return jsonify({
-                'success': False,
-                'message': e.stderr
-            }), 500
-        except Exception as e:
-            logger.error(f"Unexpected error in git_init: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': f"An unexpected error occurred: {str(e)}"
-            }), 500
-    except Exception as e:
-        logger.error(f"Error in git_init: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': f"An error occurred: {str(e)}"
-        }), 500
+        from services.analytics_service import AnalyticsService
+        return AnalyticsService()
+    except ImportError:
+        logger.warning("AnalyticsService not available")
+        return None
 
 
 @git_bp.route('/<int:workspace_id>/status')
 def git_status(workspace_id):
-    """Get Git status for a workspace."""
+    """Get git status for a workspace."""
     try:
         workspace = Workspace.query.get_or_404(workspace_id)
 
-        # Check if workspace path exists
         if not os.path.exists(workspace.path):
-            logger.error(f"Workspace path does not exist: {workspace.path}")
             return jsonify({
                 'success': False,
-                'message': f"Workspace path does not exist: {workspace.path}"
+                'message': 'Workspace directory does not exist'
             }), 404
 
-        # Check if .git directory exists
+        # Check if it's a git repository
         git_dir = os.path.join(workspace.path, '.git')
         if not os.path.exists(git_dir):
-            logger.error(f"Git repository not found in workspace: {workspace.path}")
             return jsonify({
-                'success': False,
-                'message': "Git repository not initialized in this workspace"
-            }), 404
+                'success': True,
+                'is_git_repo': False,
+                'message': 'Not a git repository'
+            })
 
+        # Get git status
         try:
+            result = subprocess.run(
+                ['git', 'status', '--porcelain'],
+                cwd=workspace.path,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+            # Parse status output
+            changes = []
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    status = line[:2]
+                    filename = line[3:]
+                    changes.append({
+                        'status': status,
+                        'filename': filename
+                    })
+
             # Get current branch
             branch_result = subprocess.run(
                 ['git', 'branch', '--show-current'],
@@ -139,64 +73,35 @@ def git_status(workspace_id):
             )
             current_branch = branch_result.stdout.strip()
 
-            # Get all branches
-            all_branches_result = subprocess.run(
-                ['git', 'branch'],
-                cwd=workspace.path,
-                capture_output=True,
-                text=True,
-                check=True
-            )
-
-            branches = []
-            for branch in all_branches_result.stdout.splitlines():
-                branch_name = branch.strip()
-                if branch_name.startswith('*'):
-                    branch_name = branch_name[1:].strip()
-                branches.append(branch_name)
-
-            # Get status
-            result = subprocess.run(
-                ['git', 'status', '--porcelain'],
-                cwd=workspace.path,
-                capture_output=True,
-                text=True,
-                check=True
-            )
-
-            changes = []
-            for line in result.stdout.splitlines():
-                if line.strip():
-                    status = line[:2].strip()
-                    filename = line[3:].strip()
-                    changes.append({
-                        'status': status,
-                        'filename': filename
-                    })
+            # Track analytics
+            analytics = get_analytics_service()
+            if analytics:
+                analytics.track_event('git_status_checked', {
+                    'ws_id': workspace_id,
+                    'has_changes': len(changes) > 0,
+                    'branch': current_branch
+                })
 
             return jsonify({
                 'success': True,
+                'is_git_repo': True,
                 'current_branch': current_branch,
-                'branches': branches,
-                'changes': changes
+                'changes': changes,
+                'has_changes': len(changes) > 0
             })
+
         except subprocess.CalledProcessError as e:
-            logger.error(f"Git status command failed: {e.stderr}")
+            logger.error(f"Git status failed: {str(e)}")
             return jsonify({
                 'success': False,
-                'message': e.stderr
+                'message': f'Git status failed: {e.stderr}'
             }), 500
-        except Exception as e:
-            logger.error(f"Unexpected error in git_status: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': f"An unexpected error occurred: {str(e)}"
-            }), 500
+
     except Exception as e:
-        logger.error(f"Error in git_status: {str(e)}")
+        logger.error(f"Error getting git status: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f"An error occurred: {str(e)}"
+            'message': str(e)
         }), 500
 
 
@@ -238,112 +143,343 @@ def git_commits(workspace_id):
 
 @git_bp.route('/<int:workspace_id>/commit', methods=['POST'])
 def git_commit(workspace_id):
-    """Create a Git commit."""
+    """Commit changes in a workspace."""
     try:
         workspace = Workspace.query.get_or_404(workspace_id)
         data = request.json
 
-        message = data.get('message', 'Update')
+        commit_message = data.get('message', 'Auto-commit from UBRITE')
+        add_all = data.get('add_all', True)
 
-        # Check if workspace path exists
         if not os.path.exists(workspace.path):
-            logger.error(f"Workspace path does not exist: {workspace.path}")
             return jsonify({
                 'success': False,
-                'message': f"Workspace path does not exist: {workspace.path}"
+                'message': 'Workspace directory does not exist'
             }), 404
 
-        # Check if .git directory exists
+        # Check if it's a git repository
         git_dir = os.path.join(workspace.path, '.git')
         if not os.path.exists(git_dir):
-            logger.error(f"Git repository not found in workspace: {workspace.path}")
             return jsonify({
                 'success': False,
-                'message': "Git repository not initialized in this workspace"
-            }), 404
+                'message': 'Not a git repository'
+            }), 400
 
         try:
-            # Stage all changes
-            subprocess.run(
-                ['git', 'add', '.'],
-                cwd=workspace.path,
-                check=True
-            )
+            # Add files if requested
+            if add_all:
+                subprocess.run(
+                    ['git', 'add', '.'],
+                    cwd=workspace.path,
+                    check=True
+                )
 
-            # Create commit
+            # Commit changes
             result = subprocess.run(
-                ['git', 'commit', '-m', message],
+                ['git', 'commit', '-m', commit_message],
                 cwd=workspace.path,
                 capture_output=True,
                 text=True,
                 check=True
             )
 
-            # Check if remote exists before pushing
-            remote_check = subprocess.run(
-                ['git', 'remote'],
-                cwd=workspace.path,
-                capture_output=True,
-                text=True
-            )
-
-            push_message = ""
-            if 'origin' in remote_check.stdout.split():
-                try:
-                    # Try to push to remote
-                    push_result = subprocess.run(
-                        ['git', 'push'],
-                        cwd=workspace.path,
-                        capture_output=True,
-                        text=True,
-                        check=True
-                    )
-                    push_message = "Changes committed and pushed to remote."
-                except subprocess.CalledProcessError as e:
-                    # If push fails, just log it but don't fail the whole operation
-                    logger.warning(f"Failed to push commit to remote: {e.stderr}")
-                    push_message = "Changes committed locally. Failed to push to remote."
-            else:
-                push_message = "Changes committed locally. No remote repository configured."
-
             # Log the event
-            log_event(workspace.id, 'git_commit', {
-                'message': message
+            log_event(workspace_id, 'git_commit', {
+                'message': commit_message,
+                'add_all': add_all
             })
 
             # Track analytics
-            analytics_service.track_event('git_commit', {
-                'ws_id': workspace.id,
-                'message': message
-            })
-
-            # Emit Socket.IO event
-            socketio.emit('git_commit', {
-                'workspace_id': workspace_id,
-                'message': message
-            })
+            analytics = get_analytics_service()
+            if analytics:
+                analytics.track_event('git_commit', {
+                    'ws_id': workspace_id,
+                    'add_all': add_all
+                })
 
             return jsonify({
                 'success': True,
-                'message': push_message
+                'message': 'Changes committed successfully',
+                'output': result.stdout
             })
+
         except subprocess.CalledProcessError as e:
-            logger.error(f"Git commit command failed: {e.stderr}")
-            return jsonify({
-                'success': False,
-                'message': e.stderr
-            }), 500
-        except Exception as e:
-            logger.error(f"Unexpected error in git_commit: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': f"An unexpected error occurred: {str(e)}"
-            }), 500
+            if 'nothing to commit' in e.stdout:
+                return jsonify({
+                    'success': True,
+                    'message': 'No changes to commit',
+                    'output': e.stdout
+                })
+            else:
+                logger.error(f"Git commit failed: {str(e)}")
+                return jsonify({
+                    'success': False,
+                    'message': f'Git commit failed: {e.stderr or e.stdout}'
+                }), 500
+
     except Exception as e:
-        logger.error(f"Error in git_commit: {str(e)}")
+        logger.error(f"Error committing changes: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f"An error occurred: {str(e)}"
+            'message': str(e)
+        }), 500
+
+
+@git_bp.route('/<int:workspace_id>/push', methods=['POST'])
+def git_push(workspace_id):
+    """Push changes to remote repository."""
+    try:
+        workspace = Workspace.query.get_or_404(workspace_id)
+
+        if not os.path.exists(workspace.path):
+            return jsonify({
+                'success': False,
+                'message': 'Workspace directory does not exist'
+            }), 404
+
+        # Check if it's a git repository
+        git_dir = os.path.join(workspace.path, '.git')
+        if not os.path.exists(git_dir):
+            return jsonify({
+                'success': False,
+                'message': 'Not a git repository'
+            }), 400
+
+        try:
+            # Push to origin
+            result = subprocess.run(
+                ['git', 'push'],
+                cwd=workspace.path,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+            # Log the event
+            log_event(workspace_id, 'git_push', {})
+
+            # Track analytics
+            analytics = get_analytics_service()
+            if analytics:
+                analytics.track_event('git_push', {
+                    'ws_id': workspace_id
+                })
+
+            return jsonify({
+                'success': True,
+                'message': 'Changes pushed successfully',
+                'output': result.stdout
+            })
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Git push failed: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': f'Git push failed: {e.stderr or e.stdout}'
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Error pushing changes: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@git_bp.route('/<int:workspace_id>/pull', methods=['POST'])
+def git_pull(workspace_id):
+    """Pull changes from remote repository."""
+    try:
+        workspace = Workspace.query.get_or_404(workspace_id)
+
+        if not os.path.exists(workspace.path):
+            return jsonify({
+                'success': False,
+                'message': 'Workspace directory does not exist'
+            }), 404
+
+        # Check if it's a git repository
+        git_dir = os.path.join(workspace.path, '.git')
+        if not os.path.exists(git_dir):
+            return jsonify({
+                'success': False,
+                'message': 'Not a git repository'
+            }), 400
+
+        try:
+            # Pull from origin
+            result = subprocess.run(
+                ['git', 'pull'],
+                cwd=workspace.path,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+            # Log the event
+            log_event(workspace_id, 'git_pull', {})
+
+            # Track analytics
+            analytics = get_analytics_service()
+            if analytics:
+                analytics.track_event('git_pull', {
+                    'ws_id': workspace_id
+                })
+
+            return jsonify({
+                'success': True,
+                'message': 'Changes pulled successfully',
+                'output': result.stdout
+            })
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Git pull failed: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': f'Git pull failed: {e.stderr or e.stdout}'
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Error pulling changes: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@git_bp.route('/<int:workspace_id>/init', methods=['POST'])
+def git_init(workspace_id):
+    """Initialize git repository in workspace."""
+    try:
+        workspace = Workspace.query.get_or_404(workspace_id)
+
+        if not os.path.exists(workspace.path):
+            return jsonify({
+                'success': False,
+                'message': 'Workspace directory does not exist'
+            }), 404
+
+        # Check if already a git repository
+        git_dir = os.path.join(workspace.path, '.git')
+        if os.path.exists(git_dir):
+            return jsonify({
+                'success': False,
+                'message': 'Already a git repository'
+            }), 400
+
+        try:
+            # Initialize git repository
+            subprocess.run(
+                ['git', 'init'],
+                cwd=workspace.path,
+                check=True
+            )
+
+            # Apply git configuration
+            git_config_service = GitConfigService()
+            git_config_service.apply_git_config_to_repository(workspace.path)
+
+            # Log the event
+            log_event(workspace_id, 'git_init', {})
+
+            # Track analytics
+            analytics = get_analytics_service()
+            if analytics:
+                analytics.track_event('git_init', {
+                    'ws_id': workspace_id
+                })
+
+            return jsonify({
+                'success': True,
+                'message': 'Git repository initialized successfully'
+            })
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Git init failed: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': f'Git init failed: {e.stderr}'
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Error initializing git repository: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@git_bp.route('/<int:workspace_id>/clone', methods=['POST'])
+def git_clone(workspace_id):
+    """Clone a repository into workspace."""
+    try:
+        workspace = Workspace.query.get_or_404(workspace_id)
+        data = request.json
+
+        repo_url = data.get('repo_url')
+        if not repo_url:
+            return jsonify({
+                'success': False,
+                'message': 'Repository URL is required'
+            }), 400
+
+        if not os.path.exists(workspace.path):
+            return jsonify({
+                'success': False,
+                'message': 'Workspace directory does not exist'
+            }), 404
+
+        # Check if directory is empty
+        if os.listdir(workspace.path):
+            return jsonify({
+                'success': False,
+                'message': 'Workspace directory is not empty'
+            }), 400
+
+        try:
+            # Clone repository
+            result = subprocess.run(
+                ['git', 'clone', repo_url, '.'],
+                cwd=workspace.path,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+            # Apply git configuration
+            git_config_service = GitConfigService()
+            git_config_service.apply_git_config_to_repository(workspace.path)
+
+            # Log the event
+            log_event(workspace_id, 'git_clone', {
+                'repo_url': repo_url
+            })
+
+            # Track analytics
+            analytics = get_analytics_service()
+            if analytics:
+                analytics.track_event('git_clone', {
+                    'ws_id': workspace_id
+                })
+
+            return jsonify({
+                'success': True,
+                'message': 'Repository cloned successfully',
+                'output': result.stdout
+            })
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Git clone failed: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': f'Git clone failed: {e.stderr}'
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Error cloning repository: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
         }), 500
 
 
@@ -422,10 +558,10 @@ def git_branch(workspace_id):
             })
 
             # Emit Socket.IO event
-            socketio.emit('git_branch_created', {
-                'workspace_id': workspace_id,
-                'branch_name': branch_name
-            })
+            # socketio.emit('git_branch_created', {
+            #     'workspace_id': workspace_id,
+            #     'branch_name': branch_name
+            # })
 
             return jsonify({
                 'success': True,
@@ -520,10 +656,10 @@ def git_checkout(workspace_id):
             })
 
             # Emit Socket.IO event
-            socketio.emit('git_branch_checkout', {
-                'workspace_id': workspace_id,
-                'branch_name': branch_name
-            })
+            # socketio.emit('git_branch_checkout', {
+            #     'workspace_id': workspace_id,
+            #     'branch_name': branch_name
+            # })
 
             return jsonify({
                 'success': True,

@@ -152,24 +152,33 @@ def create_workspace_post():
                 logger.warning(f"Error setting up git repository: {str(e)}")
 
         # Log the event
-        log_event(workspace.id, 'workspace_created', {
-            'name': name,
-            'env_type': env_type,
-            'gitlab_repo_created': gitlab_repo_id is not None
-        })
+        try:
+            log_event(workspace.id, 'workspace_created', {
+                'name': name,
+                'env_type': env_type,
+                'gitlab_repo_created': gitlab_repo_id is not None
+            })
+        except Exception as e:
+            logger.warning(f"Failed to log event: {str(e)}")
 
         # Track analytics
-        get_analytics_service().track_event('workspace_created', {
-            'ws_id': workspace.id,
-            'env_type': env_type,
-            'gitlab_repo': gitlab_repo_id is not None
-        })
+        try:
+            get_analytics_service().track_event('workspace_created', {
+                'ws_id': workspace.id,
+                'env_type': env_type,
+                'gitlab_repo': gitlab_repo_id is not None
+            })
+        except Exception as e:
+            logger.warning(f"Failed to track analytics: {str(e)}")
 
         # Emit Socket.IO event
-        socketio.emit('workspace_created', {
-            'workspace_id': workspace.id,
-            'name': name
-        })
+        try:
+            socketio.emit('workspace_created', {
+                'workspace_id': workspace.id,
+                'name': name
+            })
+        except Exception as e:
+            logger.warning(f"Failed to emit socket event: {str(e)}")
 
         return jsonify({
             'success': True,
@@ -247,9 +256,12 @@ def delete_workspace(workspace_id):
         db.session.commit()
 
         # Track analytics
-        get_analytics_service().track_event('workspace_deleted', {
-            'ws_id': workspace_id
-        })
+        try:
+            get_analytics_service().track_event('workspace_deleted', {
+                'ws_id': workspace_id
+            })
+        except Exception as e:
+            logger.warning(f"Failed to track analytics: {str(e)}")
 
         return jsonify({'success': True, 'message': 'Workspace deleted successfully'})
 

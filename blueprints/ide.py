@@ -1,97 +1,178 @@
-from flask import Blueprint, render_template, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app
 from models import Workspace
-from extensions import db
 from services.ide_service import IDEService
 from utils.filesystem import log_event
-from services.analytics_service import AnalyticsService
-import time
 import logging
 
 ide_bp = Blueprint('ide', __name__)
-ide_service = IDEService()
-analytics_service = AnalyticsService()
+logger = logging.getLogger(__name__)
+
+
+def get_analytics_service():
+    """Get analytics service instance."""
+    try:
+        from services.analytics_service import AnalyticsService
+        return AnalyticsService()
+    except ImportError:
+        logger.warning("AnalyticsService not available")
+        return None
+
 
 @ide_bp.route('/<int:workspace_id>/launch/<ide_type>')
 def launch_ide(workspace_id, ide_type):
     """Launch an IDE for a workspace."""
     try:
         workspace = Workspace.query.get_or_404(workspace_id)
-        
-        start_time = time.time()
-        
-        # Check if JupyterLab is installed before trying to launch it
-        if ide_type == 'jupyter':
-            jupyter_check, jupyter_message = ide_service.check_jupyter_installation()
-            if not jupyter_check:
-                log_event(workspace.id, 'ide_launch_failed', {
+        ide_service = IDEService()
+
+        if ide_type.lower() == 'jupyter':
+            success, result = ide_service.launch_jupyter(workspace.path)
+
+            if success:
+                # Log the event
+                log_event(workspace_id, 'ide_launched', {
                     'ide_type': ide_type,
-                    'error': jupyter_message
+                    'url': result.get('url')
                 })
+
+                # Track analytics
+                analytics = get_analytics_service()
+                if analytics:
+                    analytics.track_event('ide_launched', {
+                        'ws_id': workspace_id,
+                        'ide_type': ide_type
+                    })
+
+                return jsonify({
+                    'success': True,
+                    'message': 'IDE launched successfully',
+                    'url': result.get('url'),
+                    'port': result.get('port')
+                })
+            else:
                 return jsonify({
                     'success': False,
-                    'message': jupyter_message
+                    'message': result.get('message', 'Failed to launch IDE')
                 }), 500
-        
-        if ide_type == 'jupyter':
-            success, result = ide_service.launch_jupyter(workspace.path)
-        elif ide_type == 'vscode':
-            success, result = ide_service.launch_vscode(workspace.path)
         else:
             return jsonify({
                 'success': False,
-                'message': f'Unknown IDE type: {ide_type}'
+                'message': f'Unsupported IDE type: {ide_type}'
             }), 400
-        
-        if success:
-            # Log the event
-            duration_sec = time.time() - start_time
-            log_event(workspace.id, 'ide_launched', {
-                'ide_type': ide_type,
-                'duration_sec': duration_sec
-            })
-            
-            # Track analytics
-            analytics_service.track_event('ide_session_started', {
-                'ide_type': ide_type,
-                'duration_sec': duration_sec
-            })
-            
-            return jsonify({
-                'success': True,
-                'url': result
-            })
-        else:
-            # Log the failure
-            log_event(workspace.id, 'ide_launch_failed', {
-                'ide_type': ide_type,
-                'error': result
-            })
-            
-            return jsonify({
-                'success': False,
-                'message': result
-            }), 500
+
     except Exception as e:
-        logging.exception(f"Unexpected error launching IDE: {str(e)}")
+        logger.error(f"Error launching IDE: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f"An unexpected error occurred: {str(e)}"
+            'message': str(e)
         }), 500
 
-@ide_bp.route('/<int:workspace_id>/stop/<ide_type>')
-def stop_ide(workspace_id, ide_type):
-    """Stop a running IDE."""
+
+@ide_bp.route('/<int:workspace_id>/status')
+def ide_status(workspace_id):
+    """Get IDE status for a workspace."""
     try:
         workspace = Workspace.query.get_or_404(workspace_id)
-        
-        success, message = ide_service.stop_ide(workspace.name, ide_type)
-        
+        ide_service = IDEService()
+
+        # Check Jupyter availability
+        jupyter_available, jupyter_message = ide_service.check_jupyter_installation()
+
+        # Check if Jupyter is running for this workspace
+        jupyter_running = ide_service.is_jupyter_running(workspace.path)
+
+        # Track analytics
+        analytics = get_analytics_service()
+        if analytics:
+            analytics.track_event('ide_status_checked', {
+                'ws_id': workspace_id,
+                'jupyter_available': jupyter_available,
+                'jupyter_running': jupyter_running
+            })
+
+        return jsonify({
+            'success': True,
+            'jupyter_available': jupyter_available,
+            'jupyter_message': jupyter_message,
+            'jupyter_running': jupyter_running,
+            'jupyter_path': ide_service.jupyter_path
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting IDE status: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@ide_bp.route('/<int:workspace_id>/stop/<ide_type>', methods=['POST'])
+def stop_ide(workspace_id, ide_type):
+    """Stop an IDE for a workspace."""
+    try:
+        workspace = Workspace.query.get_or_404(workspace_id)
+        ide_service = IDEService()
+
+        if ide_type.lower() == 'jupyter':
+            success, message = ide_service.stop_jupyter(workspace.path)
+
+            if success:
+                # Log the event
+                log_event(workspace_id, 'ide_stopped', {
+                    'ide_type': ide_type
+                })
+
+                # Track analytics
+                analytics = get_analytics_service()
+                if analytics:
+                    analytics.track_event('ide_stopped', {
+                        'ws_id': workspace_id,
+                        'ide_type': ide_type
+                    })
+
+                return jsonify({
+                    'success': True,
+                    'message': message
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': message
+                }), 500
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'Unsupported IDE type: {ide_type}'
+            }), 400
+
+    except Exception as e:
+        logger.error(f"Error stopping IDE: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@ide_bp.route('/<int:workspace_id>/install-jupyter', methods=['POST'])
+def install_jupyter(workspace_id):
+    """Install Jupyter in workspace environment."""
+    try:
+        workspace = Workspace.query.get_or_404(workspace_id)
+        ide_service = IDEService()
+
+        success, message = ide_service.install_jupyter_in_workspace(workspace.path)
+
         if success:
             # Log the event
-            log_event(workspace.id, 'ide_stopped', {
-                'ide_type': ide_type
-            })
-            
+            log_event(workspace_id, 'jupyter_installed', {})
+
+            # Track analytics
+            analytics = get_analytics_service()
+            if analytics:
+                analytics.track_event('jupyter_installed', {
+                    'ws_id': workspace_id
+                })
+
             return jsonify({
                 'success': True,
                 'message': message
@@ -101,18 +182,32 @@ def stop_ide(workspace_id, ide_type):
                 'success': False,
                 'message': message
             }), 500
+
     except Exception as e:
-        logging.exception(f"Unexpected error stopping IDE: {str(e)}")
+        logger.error(f"Error installing Jupyter: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f"An unexpected error occurred: {str(e)}"
+            'message': str(e)
         }), 500
+
 
 @ide_bp.route('/check-jupyter')
 def check_jupyter():
-    """Check if JupyterLab is installed and available."""
-    success, message = ide_service.check_jupyter_installation()
-    return jsonify({
-        'success': success,
-        'message': message
-    })
+    """Check global Jupyter installation."""
+    try:
+        ide_service = IDEService()
+        available, message = ide_service.check_jupyter_installation()
+
+        return jsonify({
+            'success': True,
+            'available': available,
+            'message': message,
+            'path': ide_service.jupyter_path
+        })
+
+    except Exception as e:
+        logger.error(f"Error checking Jupyter: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
