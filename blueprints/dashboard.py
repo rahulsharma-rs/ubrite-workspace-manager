@@ -178,7 +178,7 @@ def save_settings():
         }), 500
 
 
-@dashboard_bp.route('/test-gitlab')
+@dashboard_bp.route('/test-gitlab', methods=['GET'])
 def test_gitlab():
     """Test GitLab connection."""
     try:
@@ -194,7 +194,7 @@ def test_gitlab():
         }), 500
 
 
-@dashboard_bp.route('/gitlab-status')
+@dashboard_bp.route('/gitlab-status', methods=['GET'])
 def gitlab_status():
     """Get current GitLab token status."""
     try:
@@ -211,7 +211,7 @@ def gitlab_status():
         }), 500
 
 
-@dashboard_bp.route('/debug-gitlab')
+@dashboard_bp.route('/debug-gitlab', methods=['GET'])
 def debug_gitlab():
     """Debug GitLab configuration."""
     try:
@@ -299,7 +299,34 @@ def save_git_config():
         }), 500
 
 
-@dashboard_bp.route('/env-templates')
+@dashboard_bp.route('/test-git-config', methods=['GET'])
+def test_git_config():
+    """Test Git configuration."""
+    try:
+        git_service = GitConfigService()
+        config = git_service.get_global_git_config()
+
+        if not config or not config.get('user.name') or not config.get('user.email'):
+            return jsonify({
+                'success': False,
+                'message': 'Git user name and email are required'
+            })
+
+        return jsonify({
+            'success': True,
+            'message': 'Git configuration is valid',
+            'config': config
+        })
+
+    except Exception as e:
+        logger.error(f"Error testing Git config: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@dashboard_bp.route('/env-templates', methods=['GET'])
 def get_env_templates():
     """Get available environment templates."""
     try:
@@ -320,7 +347,7 @@ def get_env_templates():
         })
 
 
-@dashboard_bp.route('/app-status')
+@dashboard_bp.route('/app-status', methods=['GET'])
 def app_status():
     """Get application status."""
     try:

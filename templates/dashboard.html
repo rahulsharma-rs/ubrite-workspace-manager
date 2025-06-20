@@ -347,7 +347,8 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const baseUrl = window.location.origin;
+    // Get the correct base URL for API calls
+    const baseUrl = window.location.origin + window.location.pathname.replace(/\/$/, '');
     let currentGitLabStatus = null;
 
     // Initialize page
@@ -393,7 +394,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <div class="card-body p-3">
                                     <h6 class="card-title">${info.icon} ${template}</h6>
                                     <p class="card-text small">${info.desc}</p>
-                                    <a href="/workspaces/create?template=${template}" class="btn btn-sm btn-outline-primary">
+                                    <a href="${baseUrl}/workspaces/create?template=${template}" class="btn btn-sm btn-outline-primary">
                                         Use Template
                                     </a>
                                 </div>
