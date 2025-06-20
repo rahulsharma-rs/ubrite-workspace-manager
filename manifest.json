@@ -1,0 +1,10 @@
+{
+    "title": "RC Workspace Python App",
+    "description": "This is a Python application deployed using Passenger.",
+    "version": "1.0.0",
+    "author": "Rahul Sharma",
+    "dependencies": {
+        "python": ">=3.8"
+    }
+}
+

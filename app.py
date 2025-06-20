@@ -1,23 +1,24 @@
-from flask import Flask
+from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO
+from flask_wtf.csrf import CSRFProtect
 from config import config
-from extensions import db, socketio
-from blueprints.dashboard import dashboard_bp
-from blueprints.workspaces import workspaces_bp
-from blueprints.git import git_bp
-from blueprints.ide import ide_bp
-from blueprints.files import files_bp
+from extensions import db, socketio, cors
 from utils.filesystem import ensure_directories
 from utils.db_migrations import run_migrations
 import os
 import socket
 import logging
 import json
+from datetime import datetime
+
 
 def create_app(config_name='default'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
-    
+
+    # Initialize CSRF protection
+    csrf = CSRFProtect(app)
+
     # Load conda path from config file if it exists
     conda_config_file = os.path.join(app.config['UBRITE_ROOT'], '.config', 'conda_config.json')
     if os.path.exists(conda_config_file):
@@ -28,7 +29,7 @@ def create_app(config_name='default'):
                     app.config['CONDA_PATH'] = conda_config['conda_path']
         except Exception as e:
             print(f"Error loading conda config: {str(e)}")
-    
+
     # Load jupyter path from config file if it exists
     jupyter_config_file = os.path.join(app.config['UBRITE_ROOT'], '.config', 'jupyter_config.json')
     if os.path.exists(jupyter_config_file):
@@ -39,7 +40,7 @@ def create_app(config_name='default'):
                     app.config['JUPYTER_PATH'] = jupyter_config['jupyter_path']
         except Exception as e:
             print(f"Error loading jupyter config: {str(e)}")
-    
+
     # Configure logging
     os.makedirs(app.config['LOGS_DIR'], exist_ok=True)
     logging.basicConfig(
@@ -50,30 +51,102 @@ def create_app(config_name='default'):
             logging.FileHandler(os.path.join(app.config['LOGS_DIR'], 'app.log'))
         ]
     )
-    
+
     # Initialize extensions
     db.init_app(app)
-    socketio.init_app(app, cors_allowed_origins="*")
-    
-    # Register blueprints
+
+    # Configure CORS
+    cors.init_app(app,
+                  origins=app.config['CORS_ORIGINS'],
+                  methods=app.config['CORS_METHODS'],
+                  allow_headers=app.config['CORS_ALLOW_HEADERS'],
+                  supports_credentials=True)
+
+    # Configure SocketIO with CORS
+    socketio.init_app(app,
+                      cors_allowed_origins=app.config['CORS_ORIGINS'],
+                      async_mode='threading')
+
+    # Import and register blueprints
+    from blueprints.dashboard import dashboard_bp
+    from blueprints.workspaces import workspaces_bp
+    from blueprints.git import git_bp
+    from blueprints.ide import ide_bp
+    from blueprints.files import files_bp
+
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(workspaces_bp, url_prefix='/workspaces')
     app.register_blueprint(git_bp, url_prefix='/git')
     app.register_blueprint(ide_bp, url_prefix='/ide')
     app.register_blueprint(files_bp, url_prefix='/files')
-    
+
+    # Add API info endpoint
+    @app.route('/api/info')
+    def api_info():
+        return jsonify({
+            'status': 'running',
+            'version': '1.0.0',
+            'cors_origins': app.config['CORS_ORIGINS'],
+            'api_base_url': app.config['API_BASE_URL']
+        })
+
+    # Add health check endpoint
+    @app.route('/health')
+    def health_check():
+        return jsonify({'status': 'healthy', 'timestamp': str(datetime.utcnow())})
+
+    # Add app status endpoint (existing functionality)
+    @app.route('/app-status')
+    def app_status():
+        try:
+            from services.analytics_service import get_app_status
+            status = get_app_status()
+            return jsonify(status)
+        except Exception as e:
+            return jsonify({'error': True, 'message': str(e)}), 500
+
+    # Error handlers with CORS support
+    @app.errorhandler(404)
+    def not_found(error):
+        if request.is_json or 'application/json' in request.headers.get('Accept', ''):
+            return jsonify({'error': 'Not found'}), 404
+        return render_template('404.html'), 404
+
+    @app.errorhandler(500)
+    def internal_error(error):
+        if request.is_json or 'application/json' in request.headers.get('Accept', ''):
+            return jsonify({'error': 'Internal server error'}), 500
+        return render_template('500.html'), 500
+
+    # CSRF error handler
+    @app.errorhandler(400)
+    def csrf_error(error):
+        if request.is_json or 'application/json' in request.headers.get('Accept', ''):
+            return jsonify({'error': 'CSRF token missing or invalid'}), 400
+        return render_template('400.html'), 400
+
+    # Template context processor to make config available in templates
+    @app.context_processor
+    def inject_config():
+        return {'config': app.config}
+
     # Ensure required directories exist and database is set up
     with app.app_context():
-        # First create the database tables
-        db.create_all()
-        
-        # Run database migrations
-        run_migrations()
-        
-        # Then ensure directories exist (with logging enabled)
-        ensure_directories(log_initialization=True)
-    
+        try:
+            # Ensure directories exist first
+            ensure_directories(log_initialization=True)
+
+            # Create the database tables
+            db.create_all()
+
+            # Run database migrations
+            run_migrations()
+
+        except Exception as e:
+            logging.error(f"Error during app initialization: {str(e)}")
+
     return app
+
 
 def find_available_port(start_port=5000, max_attempts=10):
     """Find an available port starting from start_port."""
@@ -89,13 +162,14 @@ def find_available_port(start_port=5000, max_attempts=10):
     # If no ports are available, return a different port outside the range
     return 8080
 
+
 if __name__ == '__main__':
     app = create_app()
-    
+
     # Try to find an available port
     port = find_available_port()
     logging.info(f"Starting server on port {port}")
-    
+
     try:
         socketio.run(app, debug=app.config['DEBUG'], host='0.0.0.0', port=port)
     except OSError as e:

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Bad Request - UBRITE{% endblock %}
+
+{% block header %}Bad Request{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            <h1 class="display-1">400</h1>
+            <h2 class="mb-4">Bad Request</h2>
+            <p class="lead">Your request could not be processed. This might be due to a missing or invalid CSRF token.</p>
+            <a href="{{ url_for('dashboard.index') }}" class="btn btn-primary">
+                <span data-feather="home"></span>
+                Go to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
