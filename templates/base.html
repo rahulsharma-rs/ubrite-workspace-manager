@@ -1,64 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Base Template</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="csrf-token" content="{{ csrf_token() if csrf_token else '' }}">
+<meta name="api-base-url" content="{{ config.API_BASE_URL }}">
+<title>{% block title %}UBRITE Project Workspace Manager{% endblock %}</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% block head %}{% endblock %}
 </head>
 <body>
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse" id="sidebarMenu">
+            <div class="position-sticky pt-3">
+                <div class="sidebar-header mb-4">
+                    <a class="navbar-brand" href="{{ url_for('dashboard.index') }}">
+                        <h4 class="fw-bold">UBRITE</h4>
+                        <small class="d-block text-muted">Workspace Manager</small>
+                    </a>
+                </div>
 
-    <div class="container">
-        {% block content %}
-        {% endblock %}
+                <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
+                    <span>Main Navigation</span>
+                </h6>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{{ url_for('dashboard.index') }}">
+                            <span data-feather="home"></span>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/workspaces' in request.path %}active{% endif %}" href="{{ url_for('workspaces.list_workspaces') }}">
+                            <span data-feather="folder"></span>
+                            Workspaces
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="collapse" data-bs-target="#config-collapse">
+                            <span data-feather="settings"></span>
+                            Configuration
+                        </a>
+                        <div class="collapse" id="config-collapse">
+                            <ul class="nav flex-column ms-3">
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{ url_for('dashboard.index') }}#gitlab-config">
+                                        <span data-feather="git-branch"></span>
+                                        GitLab Settings
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{ url_for('dashboard.index') }}#conda-config">
+                                        <span data-feather="package"></span>
+                                        Conda Settings
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{ url_for('dashboard.index') }}#jupyter-config">
+                                        <span data-feather="code"></span>
+                                        JupyterLab Settings
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{ url_for('dashboard.index') }}#app-status-section">
+                                        <span data-feather="activity"></span>
+                                        System Status
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main content -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">{% block header %}{% endblock %}</h1>
+                <div class="btn-toolbar mb-2 mb-md-0">
+                    <button type="button" class="btn btn-sm btn-outline-secondary d-md-none" data-bs-toggle="collapse" data-bs-target="#sidebarMenu">
+                        <span data-feather="menu"></span>
+                        Menu
+                    </button>
+                    {% block header_buttons %}{% endblock %}
+                </div>
+            </div>
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages mb-3">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
     </div>
+</div>
 
-    <script>
-        // Global error handler for AJAX requests
-        $(document).ajaxError(function(event, xhr, settings, thrownError) {
-            console.error('AJAX Error:', {
-                url: settings.url,
-                status: xhr.status,
-                error: thrownError,
-                response: xhr.responseText
-            });
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Socket.IO -->
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<!-- Feather Icons -->
+<script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+<!-- API Client -->
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<!-- Custom JS -->
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
-            // Show user-friendly error message
-            if (xhr.status === 401) {
-                if (typeof showGlobalAlert === 'function') {
-                    showGlobalAlert('Session expired. Please refresh the page.', 'warning');
-                }
-            } else if (xhr.status >= 500) {
-                if (typeof showGlobalAlert === 'function') {
-                    showGlobalAlert('Server error. Please try again later.', 'error');
-                }
-            }
-        });
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Feather icons
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
 
-        // Global function to handle API errors consistently
-        window.handleGlobalAPIError = function(error, operation) {
-            console.error(`Error ${operation}:`, error);
+        // Configure API client with base URL from meta tag
+        const apiBaseUrl = document.querySelector('meta[name="api-base-url"]')?.getAttribute('content') || window.location.origin;
+        if (typeof APIClient !== 'undefined') {
+            window.apiClient = new APIClient({ baseURL: apiBaseUrl });
+            // Make API available globally
+            window.API = API;
+        }
+    });
+</script>
 
-            let message = `Failed to ${operation}`;
-
-            if (error.status === 401) {
-                message = 'Authentication required. Please refresh the page.';
-            } else if (error.status === 403) {
-                message = 'Access denied.';
-            } else if (error.status === 404) {
-                message = 'Resource not found.';
-            } else if (error.status >= 500) {
-                message = 'Server error. Please try again later.';
-            } else if (error.responseJSON && error.responseJSON.message) {
-                message = error.responseJSON.message;
-            }
-
-            if (typeof showGlobalAlert === 'function') {
-                showGlobalAlert(message, 'error');
-            }
-
-            return message;
-        };
-    </script>
+<!-- Additional scripts -->
+{% block scripts %}{% endblock %}
 </body>
 </html>

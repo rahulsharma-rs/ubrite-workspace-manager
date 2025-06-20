@@ -56,31 +56,6 @@
     </div>
 </div>
 
-<!-- Environment Templates Section -->
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Available Python Virtual Environment Templates</h5>
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#templateCollapse" aria-expanded="false" aria-controls="templateCollapse">
-                    Show/Hide
-                </button>
-            </div>
-            <div class="collapse" id="templateCollapse">
-                <div class="card-body">
-                    <div class="row row-cols-1 row-cols-md-3 g-3" id="template-cards">
-                        <div class="text-center">
-                            <div class="spinner-border" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Configuration Section -->
 <h2 class="mt-5 mb-4">Configuration</h2>
 
@@ -203,69 +178,73 @@
     </div>
 </div>
 
-<!-- Git Configuration -->
-<div class="row mb-4" id="git-config">
+<!-- Conda Configuration -->
+<div class="row mb-4" id="conda-config">
     <div class="col-md-12">
         <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Git User Configuration</h5>
-                <button id="test-git-config-btn" class="btn btn-sm btn-outline-secondary">
-                    Test Configuration
-                </button>
+            <div class="card-header">
+                <h5 class="card-title mb-0">Conda Configuration</h5>
             </div>
             <div class="card-body">
-                <div id="git-config-status" class="mb-3"></div>
-                <form id="git-config-form">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="git-user-name" class="form-label">Git User Name</label>
-                                <input type="text" class="form-control" id="git-user-name" name="git_user_name" required>
-                                <div class="form-text">
-                                    Your name for git commits (e.g., "John Doe")
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="git-user-email" class="form-label">Git User Email</label>
-                                <input type="email" class="form-control" id="git-user-email" name="git_user_email" required>
-                                <div class="form-text">
-                                    Your email for git commits
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="git-ssh-key-path" class="form-label">SSH Key Path (Optional)</label>
-                                <input type="text" class="form-control" id="git-ssh-key-path" name="git_ssh_key_path" placeholder="~/.ssh/id_rsa">
-                                <div class="form-text">
-                                    Path to your SSH private key for git operations
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="git-signing-key" class="form-label">GPG Signing Key (Optional)</label>
-                                <input type="text" class="form-control" id="git-signing-key" name="git_signing_key" placeholder="GPG Key ID">
-                                <div class="form-text">
-                                    GPG key ID for signing commits
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div id="conda-status" class="mb-3"></div>
+                <form id="conda-settings-form">
                     <div class="mb-3">
-                        <label for="git-default-branch" class="form-label">Default Branch Name</label>
-                        <input type="text" class="form-control" id="git-default-branch" name="git_default_branch" value="main">
+                        <label for="conda-path" class="form-label">Conda Path</label>
+                        <input type="text" class="form-control" id="conda-path" name="conda_path"
+                               placeholder="/opt/miniconda3/bin/conda">
                         <div class="form-text">
-                            Default branch name for new repositories
+                            Path to conda executable (leave empty for auto-detection)
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">Save Git Configuration</button>
+
+                    <div class="mb-3">
+                        <label for="conda-env-path" class="form-label">Environment Path</label>
+                        <input type="text" class="form-control" id="conda-env-path" name="conda_env_path"
+                               placeholder="/opt/miniconda3/envs">
+                        <div class="form-text">
+                            Directory where conda environments are stored
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Save Conda Configuration</button>
                 </form>
-                <div id="git-config-form-status" class="mt-3"></div>
+                <div id="conda-settings-status" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JupyterLab Configuration -->
+<div class="row mb-4" id="jupyter-config">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">JupyterLab Configuration</h5>
+            </div>
+            <div class="card-body">
+                <div id="jupyter-status" class="mb-3"></div>
+                <form id="jupyter-settings-form">
+                    <div class="mb-3">
+                        <label for="jupyter-port-range" class="form-label">Port Range</label>
+                        <input type="text" class="form-control" id="jupyter-port-range" name="jupyter_port_range"
+                               placeholder="8888-8999" value="8888-8999">
+                        <div class="form-text">
+                            Port range for JupyterLab instances (format: start-end)
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="jupyter-base-url" class="form-label">Base URL</label>
+                        <input type="text" class="form-control" id="jupyter-base-url" name="jupyter_base_url"
+                               placeholder="/jupyter">
+                        <div class="form-text">
+                            Base URL path for JupyterLab instances
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Save JupyterLab Configuration</button>
+                </form>
+                <div id="jupyter-settings-status" class="mt-3"></div>
             </div>
         </div>
     </div>
@@ -305,7 +284,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize page
     loadSettings();
     loadAppStatus();
-    loadEnvironmentTemplates();
 
     // Set up periodic status checks
     setInterval(checkGitLabTokenStatus, 300000); // Check every 5 minutes
@@ -340,6 +318,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     showStatus('gitlab-status', 'GitLab token not configured', 'warning');
                     updateGitLabStatusBadge('not configured', 'bg-warning');
+                }
+
+                // Populate other settings
+                if (data.conda_path) {
+                    document.getElementById('conda-path').value = data.conda_path;
+                }
+                if (data.conda_env_path) {
+                    document.getElementById('conda-env-path').value = data.conda_env_path;
+                }
+                if (data.jupyter_port_range) {
+                    document.getElementById('jupyter-port-range').value = data.jupyter_port_range;
+                }
+                if (data.jupyter_base_url) {
+                    document.getElementById('jupyter-base-url').value = data.jupyter_base_url;
                 }
             })
             .catch(error => {
@@ -667,58 +659,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     });
 
-    // Load environment templates
-    function loadEnvironmentTemplates() {
-        fetch(`${baseUrl}/env-templates`)
-            .then(response => response.json())
-            .then(data => {
-                const container = document.getElementById('template-cards');
-
-                if (!data.success || !data.templates || data.templates.length === 0) {
-                    container.innerHTML = '<div class="col-12"><p>No environment templates found.</p></div>';
-                    return;
-                }
-
-                // Template descriptions and icons
-                const templateInfo = {
-                    'data-science': { icon: '📊', desc: 'General data science packages (numpy, pandas, matplotlib, scikit-learn)' },
-                    'web-dev': { icon: '🌐', desc: 'Web development packages (Flask, SQLAlchemy, etc.)' },
-                    'deep-learning': { icon: '🧠', desc: 'Deep learning frameworks and tools (PyTorch, TensorFlow, transformers)' },
-                    'bioinformatics': { icon: '🧬', desc: 'Bioinformatics tools and libraries (Biopython, BLAST, samtools)' },
-                    'nlp': { icon: '📝', desc: 'Natural Language Processing libraries (NLTK, spaCy, transformers)' },
-                    'computer-vision': { icon: '👁️', desc: 'Computer Vision libraries (OpenCV, torchvision, detectron2)' },
-                    'geospatial': { icon: '🌍', desc: 'Geospatial analysis tools (GeoPandas, GDAL, rasterio)' },
-                    'scientific-computing': { icon: '🔬', desc: 'Scientific computing and simulation (FEniCS, PETSc, Numba)' },
-                    'statistics': { icon: '📈', desc: 'Statistical analysis packages (statsmodels, PyMC3, R integration)' }
-                };
-
-                let html = '';
-                data.templates.forEach(template => {
-                    const info = templateInfo[template] || { icon: '📦', desc: 'Custom environment template' };
-                    html += `
-                        <div class="col">
-                            <div class="card h-100">
-                                <div class="card-body p-3">
-                                    <h6 class="card-title">${info.icon} ${template}</h6>
-                                    <p class="card-text small">${info.desc}</p>
-                                    <a href="/workspaces/create?template=${template}" class="btn btn-sm btn-outline-primary">
-                                        Use Template
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                container.innerHTML = html;
-            })
-            .catch(error => {
-                console.error('Error loading templates:', error);
-                const container = document.getElementById('template-cards');
-                container.innerHTML = '<div class="col-12"><p>Failed to load environment templates.</p></div>';
-            });
-    }
-
     // Load application status
     function loadAppStatus() {
         fetch(`${baseUrl}/app-status`)
@@ -847,9 +787,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 5000);
         }
     }
-
-    // Git configuration handling (existing code)
-    // ... (keep existing git config code)
 
     // Initialize Feather icons
     if (typeof feather !== 'undefined') {
