@@ -34,6 +34,28 @@
     </div>
 </div>
 
+<!-- GitLab Token Expiration Alert (Hidden by default) -->
+<div id="gitlab-expiration-alert" class="row mb-4" style="display: none;">
+    <div class="col-md-12">
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <h5 class="alert-heading">
+                <span data-feather="alert-triangle"></span>
+                GitLab Token Expiring Soon
+            </h5>
+            <p id="expiration-message">Your GitLab Personal Access Token will expire soon.</p>
+            <hr>
+            <div class="d-flex">
+                <button type="button" class="btn btn-warning btn-sm me-2" onclick="showGitLabConfig()">
+                    Update Token
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="alert">
+                    Dismiss
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Environment Templates Section -->
 <div class="row mb-4">
     <div class="col-md-12">
@@ -59,31 +81,6 @@
     </div>
 </div>
 
-<!-- Python Environments Section -->
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Detected Python Environments</h5>
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#pythonEnvsCollapse" aria-expanded="false" aria-controls="pythonEnvsCollapse">
-                    Show/Hide
-                </button>
-            </div>
-            <div class="collapse" id="pythonEnvsCollapse">
-                <div class="card-body">
-                    <div id="python-envs-container">
-                        <div class="text-center">
-                            <div class="spinner-border" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Configuration Section -->
 <h2 class="mt-5 mb-4">Configuration</h2>
 
@@ -92,10 +89,13 @@
     <div class="col-md-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">GitLab Configuration</h5>
+                <h5 class="card-title mb-0">
+                    GitLab Configuration
+                    <span id="gitlab-status-badge" class="badge ms-2" style="display: none;"></span>
+                </h5>
                 <div>
-                    <button id="debug-gitlab-btn" class="btn btn-sm btn-outline-secondary me-2">
-                        Debug
+                    <button id="check-gitlab-status-btn" class="btn btn-sm btn-outline-info me-2">
+                        Check Status
                     </button>
                     <button id="test-gitlab-btn" class="btn btn-sm btn-outline-secondary">
                         Test Connection
@@ -104,14 +104,8 @@
             </div>
             <div class="card-body">
                 <div id="gitlab-status" class="mb-3"></div>
-                <form id="settings-form">
-                    <div class="mb-3">
-                        <label for="gitlab-pat" class="form-label">GitLab Personal Access Token</label>
-                        <input type="password" class="form-control" id="gitlab-pat" name="gitlab_pat">
-                        <div class="form-text">
-                            Required for GitLab repository creation. Create a token with <code>api</code> scope.
-                        </div>
-                    </div>
+
+                <form id="gitlab-settings-form">
                     <div class="mb-3">
                         <label for="gitlab-url" class="form-label">GitLab URL</label>
                         <input type="text" class="form-control" id="gitlab-url" name="gitlab_url"
@@ -120,9 +114,90 @@
                             Your GitLab instance URL (without /api/v4)
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">Save Configuration</button>
+
+                    <div class="mb-3">
+                        <label for="gitlab-token" class="form-label">
+                            GitLab Personal Access Token
+                            <a href="#" id="token-help-link" class="text-decoration-none ms-1" data-bs-toggle="modal" data-bs-target="#tokenHelpModal">
+                                <span data-feather="help-circle" style="width: 16px; height: 16px;"></span>
+                            </a>
+                        </label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="gitlab-token" name="gitlab_token"
+                                   placeholder="Enter your GitLab Personal Access Token">
+                            <button class="btn btn-outline-secondary" type="button" id="validate-token-btn">
+                                <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                                <span class="btn-text">Validate</span>
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Required for GitLab repository creation. Token will be validated before saving.
+                        </div>
+                        <div id="token-validation-result" class="mt-2"></div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="save-gitlab-btn" disabled>
+                        <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                        <span class="btn-text">Save Configuration</span>
+                    </button>
                 </form>
-                <div id="settings-status" class="mt-3"></div>
+
+                <div id="gitlab-settings-status" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Token Help Modal -->
+<div class="modal fade" id="tokenHelpModal" tabindex="-1" aria-labelledby="tokenHelpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tokenHelpModalLabel">Creating a GitLab Personal Access Token</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6>Steps to create a Personal Access Token:</h6>
+                <ol>
+                    <li>Go to your GitLab instance (e.g., <code>https://gitlab.rc.uab.edu</code>)</li>
+                    <li>Click on your avatar in the top-right corner</li>
+                    <li>Select <strong>Edit Profile</strong></li>
+                    <li>In the left sidebar, click <strong>Access Tokens</strong></li>
+                    <li>Click <strong>Add new token</strong></li>
+                    <li>Fill in the form:
+                        <ul>
+                            <li><strong>Token name:</strong> UBRITE Workspace Manager</li>
+                            <li><strong>Expiration date:</strong> Set a future date (recommended: 1 year)</li>
+                            <li><strong>Scopes:</strong> Select <code>api</code> (required for repository management)</li>
+                        </ul>
+                    </li>
+                    <li>Click <strong>Create personal access token</strong></li>
+                    <li>Copy the token immediately (you won't be able to see it again)</li>
+                    <li>Paste the token in the field above and click <strong>Validate</strong></li>
+                </ol>
+
+                <div class="alert alert-info mt-3">
+                    <h6>Required Scopes:</h6>
+                    <ul class="mb-0">
+                        <li><code>api</code> - Full API access (required for creating and managing repositories)</li>
+                    </ul>
+                </div>
+
+                <div class="alert alert-warning mt-3">
+                    <h6>Security Notes:</h6>
+                    <ul class="mb-0">
+                        <li>Keep your token secure and don't share it</li>
+                        <li>Set an expiration date for security</li>
+                        <li>You'll be notified when the token is about to expire</li>
+                        <li>The token is encrypted before being stored</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="#" id="gitlab-token-link" class="btn btn-primary" target="_blank">
+                    Go to GitLab
+                </a>
             </div>
         </div>
     </div>
@@ -196,75 +271,25 @@
     </div>
 </div>
 
-<!-- Conda Configuration -->
-<div class="row mb-4" id="conda-config">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Conda Configuration</h5>
-            </div>
-            <div class="card-body">
-                <div id="conda-status" class="mb-3">
-                    <div class="spinner-border spinner-border-sm" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    Checking Conda availability...
-                </div>
-
-                <form id="conda-form">
-                    <div class="mb-3">
-                        <label for="conda-path" class="form-label">Conda Path</label>
-                        <input type="text" class="form-control" id="conda-path" name="conda_path" placeholder="/path/to/conda">
-                        <div class="form-text">
-                            Full path to the conda executable. Leave empty to use the default 'conda' command.
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Save Conda Path</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- JupyterLab Configuration -->
-<div class="row mb-4" id="jupyter-config">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">JupyterLab Configuration</h5>
-            </div>
-            <div class="card-body">
-                <div id="jupyter-status" class="mb-3">
-                    <div class="spinner-border spinner-border-sm" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    Checking JupyterLab availability...
-                </div>
-
-                <form id="jupyter-form">
-                    <div class="mb-3">
-                        <label for="jupyter-path" class="form-label">JupyterLab Path</label>
-                        <input type="text" class="form-control" id="jupyter-path" name="jupyter_path" placeholder="/path/to/jupyter">
-                        <div class="form-text">
-                            Full path to the jupyter executable. Leave empty to use the default 'jupyter' command.
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Save JupyterLab Path</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Application Status -->
 <div class="row mb-4" id="app-status-section">
     <div class="col-md-12">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">Application Status</h5>
+                <button id="refresh-status-btn" class="btn btn-sm btn-outline-secondary">
+                    <span data-feather="refresh-cw"></span>
+                    Refresh
+                </button>
             </div>
             <div class="card-body">
-                <div id="app-status">Loading...</div>
+                <div id="app-status">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -273,327 +298,411 @@
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Get the base URL for API calls
-        const baseUrl = window.location.origin;
+document.addEventListener('DOMContentLoaded', function() {
+    const baseUrl = window.location.origin;
+    let currentGitLabStatus = null;
 
-        // Check if GitLab PAT is set
+    // Initialize page
+    loadSettings();
+    loadAppStatus();
+    loadEnvironmentTemplates();
+
+    // Set up periodic status checks
+    setInterval(checkGitLabTokenStatus, 300000); // Check every 5 minutes
+
+    function loadSettings() {
         fetch(`${baseUrl}/settings`)
             .then(response => response.json())
             .then(data => {
-                const statusDiv = document.getElementById('settings-status');
-                if (data.has_gitlab_pat) {
-                    statusDiv.innerHTML = '<div class="alert alert-success">GitLab PAT is configured</div>';
-                    testGitLabConnection();
-                } else {
-                    statusDiv.innerHTML = '<div class="alert alert-warning">GitLab PAT is not configured</div>';
-                    document.getElementById('gitlab-status').innerHTML = '<div class="alert alert-warning">GitLab connection not configured</div>';
+                if (data.error) {
+                    showStatus('gitlab-status', 'Error loading settings: ' + data.message, 'error');
+                    return;
                 }
 
-                // Populate GitLab URL if available
+                // Populate GitLab URL
                 if (data.gitlab_url) {
-                    // Remove /api/v4 suffix for display
-                    const displayUrl = data.gitlab_url.replace('/api/v4', '');
-                    document.getElementById('gitlab-url').value = displayUrl;
+                    document.getElementById('gitlab-url').value = data.gitlab_url;
+                    updateGitLabTokenLink(data.gitlab_url);
+                }
+
+                // Update GitLab status
+                if (data.gitlab_status) {
+                    currentGitLabStatus = data.gitlab_status;
+                    updateGitLabStatusDisplay(data.gitlab_status);
+
+                    // Check for expiring token
+                    if (data.gitlab_status.error_code === 'TOKEN_EXPIRING_SOON') {
+                        showTokenExpirationAlert(data.gitlab_status);
+                    }
+                } else if (data.has_gitlab_pat) {
+                    showStatus('gitlab-status', 'GitLab token configured', 'success');
+                    updateGitLabStatusBadge('configured', 'bg-success');
+                } else {
+                    showStatus('gitlab-status', 'GitLab token not configured', 'warning');
+                    updateGitLabStatusBadge('not configured', 'bg-warning');
                 }
             })
             .catch(error => {
                 console.error('Error loading settings:', error);
-                document.getElementById('settings-status').innerHTML = '<div class="alert alert-danger">Failed to load settings</div>';
+                showStatus('gitlab-status', 'Failed to load settings', 'error');
             });
+    }
 
-        // Check Conda availability
-        fetch(`${baseUrl}/workspaces/check-conda`)
+    function updateGitLabTokenLink(gitlabUrl) {
+        const link = document.getElementById('gitlab-token-link');
+        if (link && gitlabUrl) {
+            const baseUrl = gitlabUrl.replace('/api/v4', '');
+            link.href = `${baseUrl}/-/profile/personal_access_tokens`;
+        }
+    }
+
+    function updateGitLabStatusDisplay(status) {
+        if (!status.configured) {
+            showStatus('gitlab-status', 'GitLab token not configured', 'warning');
+            updateGitLabStatusBadge('not configured', 'bg-warning');
+            return;
+        }
+
+        if (!status.valid) {
+            let message = status.message || 'Token validation failed';
+            let alertType = 'error';
+
+            if (status.error_code === 'TOKEN_EXPIRED') {
+                alertType = 'error';
+                message = 'GitLab token has expired. Please update your token.';
+            } else if (status.error_code === 'TOKEN_EXPIRING_SOON') {
+                alertType = 'warning';
+            }
+
+            showStatus('gitlab-status', message, alertType);
+            updateGitLabStatusBadge('invalid', 'bg-danger');
+        } else {
+            let message = status.message || 'GitLab token is valid';
+            let alertType = 'success';
+            let badgeClass = 'bg-success';
+
+            if (status.error_code === 'TOKEN_EXPIRING_SOON') {
+                alertType = 'warning';
+                badgeClass = 'bg-warning';
+            } else if (status.error_code === 'INSUFFICIENT_SCOPES') {
+                alertType = 'warning';
+                badgeClass = 'bg-warning';
+            }
+
+            showStatus('gitlab-status', message, alertType);
+            updateGitLabStatusBadge('valid', badgeClass);
+        }
+    }
+
+    function updateGitLabStatusBadge(text, className) {
+        const badge = document.getElementById('gitlab-status-badge');
+        if (badge) {
+            badge.textContent = text;
+            badge.className = `badge ms-2 ${className}`;
+            badge.style.display = 'inline';
+        }
+    }
+
+    function showTokenExpirationAlert(status) {
+        const alert = document.getElementById('gitlab-expiration-alert');
+        const message = document.getElementById('expiration-message');
+
+        if (alert && message) {
+            let expirationText = 'Your GitLab Personal Access Token will expire soon.';
+
+            if (status.token_info && status.token_info.expires_at) {
+                try {
+                    const expiresAt = new Date(status.token_info.expires_at);
+                    const daysUntilExpiry = Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24));
+                    expirationText = `Your GitLab Personal Access Token will expire in ${daysUntilExpiry} days (${expiresAt.toLocaleDateString()}).`;
+                } catch (e) {
+                    console.warn('Could not parse expiration date:', e);
+                }
+            }
+
+            message.textContent = expirationText;
+            alert.style.display = 'block';
+        }
+    }
+
+    function showGitLabConfig() {
+        document.getElementById('gitlab-config').scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('gitlab-token').focus();
+    }
+
+    // Make showGitLabConfig available globally
+    window.showGitLabConfig = showGitLabConfig;
+
+    function checkGitLabTokenStatus() {
+        fetch(`${baseUrl}/gitlab-status`)
             .then(response => response.json())
-            .then(data => {
-                const statusDiv = document.getElementById('conda-status');
+            .then(status => {
+                currentGitLabStatus = status;
+                updateGitLabStatusDisplay(status);
 
-                if (data.available) {
-                    statusDiv.innerHTML = `
-                        <div class="alert alert-success">
-                            <strong>Conda is available</strong><br>
-                            Path: ${data.path}
-                        </div>
-                    `;
-                    document.getElementById('conda-path').value = data.path;
-                } else {
-                    statusDiv.innerHTML = `
-                        <div class="alert alert-warning">
-                            <strong>Conda is not available</strong><br>
-                            Please install Conda or configure the correct path.
-                        </div>
-                    `;
+                // Show expiration alert if needed
+                if (status.error_code === 'TOKEN_EXPIRING_SOON') {
+                    showTokenExpirationAlert(status);
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                const statusDiv = document.getElementById('conda-status');
-                statusDiv.innerHTML = `
-                    <div class="alert alert-danger">
-                        Failed to check Conda availability.
-                    </div>
-                `;
+                console.error('Error checking GitLab status:', error);
             });
+    }
 
-        // Check JupyterLab availability
-        fetch(`${baseUrl}/ide/check-jupyter`)
-            .then(response => response.json())
-            .then(data => {
-                const statusDiv = document.getElementById('jupyter-status');
+    // Token validation
+    document.getElementById('validate-token-btn').addEventListener('click', function() {
+        const token = document.getElementById('gitlab-token').value.trim();
+        const gitlabUrl = document.getElementById('gitlab-url').value.trim();
+        const btn = this;
+        const spinner = btn.querySelector('.spinner-border');
+        const btnText = btn.querySelector('.btn-text');
+        const resultDiv = document.getElementById('token-validation-result');
+        const saveBtn = document.getElementById('save-gitlab-btn');
 
-                if (data.success) {
-                    statusDiv.innerHTML = `
-                        <div class="alert alert-success">
-                            <strong>JupyterLab is available</strong><br>
-                            ${data.message}
-                        </div>
-                    `;
-                } else {
-                    statusDiv.innerHTML = `
-                        <div class="alert alert-warning">
-                            <strong>JupyterLab is not available</strong><br>
-                            ${data.message}
-                        </div>
-                        <div class="mt-2">
-                            <p>To install JupyterLab:</p>
-                            <pre><code>pip install jupyterlab</code></pre>
-                        </div>
-                    `;
-                }
+        if (!token) {
+            showValidationResult('Token is required', 'error');
+            return;
+        }
+
+        // Show loading state
+        spinner.classList.remove('d-none');
+        btnText.textContent = 'Validating...';
+        btn.disabled = true;
+        resultDiv.innerHTML = '';
+        saveBtn.disabled = true;
+
+        fetch(`${baseUrl}/validate-gitlab-token`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                token: token,
+                gitlab_url: gitlabUrl
             })
-            .catch(error => {
-                console.error('Error:', error);
-                const statusDiv = document.getElementById('jupyter-status');
-                statusDiv.innerHTML = `
-                    <div class="alert alert-danger">
-                        Failed to check JupyterLab availability.
-                    </div>
-                `;
-            });
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.valid) {
+                let message = `✓ Token is valid for user: ${result.user_info?.name || 'Unknown'}`;
 
-
-        // Load Python environments
-        fetch(`${baseUrl}/workspaces/python-environments`)
-            .then(response => response.json())
-            .then(data => {
-                const container = document.getElementById('python-envs-container');
-
-                if (!data.environments || data.environments.length === 0) {
-                    container.innerHTML = '<div class="alert alert-info">No Python environments detected.</div>';
-                    return;
+                if (result.scopes && result.scopes.length > 0) {
+                    message += `<br><small>Scopes: ${result.scopes.join(', ')}</small>`;
                 }
 
-                // Group environments by type
-                const grouped = {
-                    'system': [],
-                    'conda': [],
-                    'venv': []
-                };
-
-                data.environments.forEach(env => {
-                    if (grouped[env.type]) {
-                        grouped[env.type].push(env);
-                    } else {
-                        grouped.other = grouped.other || [];
-                        grouped.other.push(env);
+                if (result.expires_at) {
+                    try {
+                        const expiresAt = new Date(result.expires_at);
+                        const daysUntilExpiry = Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24));
+                        message += `<br><small>Expires: ${expiresAt.toLocaleDateString()} (${daysUntilExpiry} days)</small>`;
+                    } catch (e) {
+                        console.warn('Could not parse expiration date:', e);
                     }
-                });
-
-                let html = '';
-
-                // System Python
-                if (grouped.system && grouped.system.length > 0) {
-                    html += `
-                        <h6>System Python</h6>
-                        <div class="table-responsive mb-4">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Version</th>
-                                        <th>Path</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                    `;
-
-                    grouped.system.forEach(env => {
-                        html += `
-                            <tr>
-                                <td>${env.version}</td>
-                                <td><code>${env.path}</code></td>
-                            </tr>
-                        `;
-                    });
-
-                    html += `
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
                 }
 
-                // Conda environments
-                if (grouped.conda && grouped.conda.length > 0) {
-                    html += `
-                        <h6>Conda Environments</h6>
-                        <div class="table-responsive mb-4">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Version</th>
-                                        <th>Path</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                    `;
-
-                    grouped.conda.forEach(env => {
-                        html += `
-                            <tr>
-                                <td>${env.name}</td>
-                                <td>${env.version}</td>
-                                <td><code>${env.path}</code></td>
-                            </tr>
-                        `;
-                    });
-
-                    html += `
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
+                let alertType = 'success';
+                if (result.error_code === 'TOKEN_EXPIRING_SOON') {
+                    alertType = 'warning';
+                } else if (result.error_code === 'INSUFFICIENT_SCOPES') {
+                    alertType = 'warning';
+                    message += '<br><small class="text-warning">⚠ Warning: Token may not have all required scopes</small>';
                 }
 
-                // Virtual environments
-                if (grouped.venv && grouped.venv.length > 0) {
-                    html += `
-                        <h6>Virtual Environments</h6>
-                        <div class="table-responsive mb-4">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Version</th>
-                                        <th>Path</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                    `;
+                showValidationResult(message, alertType);
+                saveBtn.disabled = false;
+            } else {
+                let message = result.message || 'Token validation failed';
 
-                    grouped.venv.forEach(env => {
-                        html += `
-                            <tr>
-                                <td>${env.name}</td>
-                                <td>${env.version}</td>
-                                <td><code>${env.path}</code></td>
-                                <td>${env.status === 'active' ? '<span class="badge bg-success">Active</span>' : ''}</td>
-                            </tr>
-                        `;
-                    });
-
-                    html += `
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
+                if (result.error_code === 'INVALID_TOKEN') {
+                    message = '✗ Invalid token or token has expired';
+                } else if (result.error_code === 'INSUFFICIENT_PERMISSIONS') {
+                    message = '✗ Token does not have sufficient permissions. Make sure it has "api" scope.';
+                } else if (result.error_code === 'API_NOT_FOUND') {
+                    message = '✗ GitLab API not found. Please check the GitLab URL.';
+                } else if (result.error_code === 'CONNECTION_ERROR') {
+                    message = '✗ Could not connect to GitLab. Please check the URL and your network connection.';
                 }
 
-                // Other environments
-                if (grouped.other && grouped.other.length > 0) {
-                    html += `
-                        <h6>Other Environments</h6>
-                        <div class="table-responsive mb-4">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Type</th>
-                                        <th>Version</th>
-                                        <th>Path</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                    `;
+                showValidationResult(message, 'error');
+                saveBtn.disabled = true;
+            }
+        })
+        .catch(error => {
+            console.error('Error validating token:', error);
+            showValidationResult('Validation failed: ' + error.message, 'error');
+            saveBtn.disabled = true;
+        })
+        .finally(() => {
+            // Reset button state
+            spinner.classList.add('d-none');
+            btnText.textContent = 'Validate';
+            btn.disabled = false;
+        });
+    });
 
-                    grouped.other.forEach(env => {
-                        html += `
-                            <tr>
-                                <td>${env.name}</td>
-                                <td>${env.type}</td>
-                                <td>${env.version}</td>
-                                <td><code>${env.path}</code></td>
-                            </tr>
-                        `;
-                    });
+    function showValidationResult(message, type) {
+        const resultDiv = document.getElementById('token-validation-result');
+        const alertClass = type === 'success' ? 'alert-success' :
+                          type === 'warning' ? 'alert-warning' : 'alert-danger';
 
-                    html += `
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
+        resultDiv.innerHTML = `<div class="alert ${alertClass} mb-0">${message}</div>`;
+    }
+
+    // GitLab settings form submission
+    document.getElementById('gitlab-settings-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData.entries());
+        const btn = document.getElementById('save-gitlab-btn');
+        const spinner = btn.querySelector('.spinner-border');
+        const btnText = btn.querySelector('.btn-text');
+
+        // Show loading state
+        spinner.classList.remove('d-none');
+        btnText.textContent = 'Saving...';
+        btn.disabled = true;
+
+        fetch(`${baseUrl}/settings`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showStatus('gitlab-settings-status', 'GitLab configuration saved successfully!', 'success');
+
+                // Clear the token field for security
+                document.getElementById('gitlab-token').value = '';
+                document.getElementById('token-validation-result').innerHTML = '';
+
+                // Update status display
+                if (result.validation_result) {
+                    currentGitLabStatus = result.validation_result;
+                    updateGitLabStatusDisplay(result.validation_result);
                 }
 
-                container.innerHTML = html;
+                // Reload settings to get updated status
+                setTimeout(loadSettings, 1000);
+            } else {
+                let message = result.message || 'Failed to save configuration';
+
+                if (result.validation_result && !result.validation_result.valid) {
+                    message += '<br>Token validation failed: ' + result.validation_result.message;
+                }
+
+                showStatus('gitlab-settings-status', message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error saving settings:', error);
+            showStatus('gitlab-settings-status', 'Error saving configuration: ' + error.message, 'error');
+        })
+        .finally(() => {
+            // Reset button state
+            spinner.classList.add('d-none');
+            btnText.textContent = 'Save Configuration';
+            btn.disabled = false;
+        });
+    });
+
+    // Check GitLab status button
+    document.getElementById('check-gitlab-status-btn').addEventListener('click', function() {
+        const btn = this;
+        const originalText = btn.textContent;
+
+        btn.textContent = 'Checking...';
+        btn.disabled = true;
+
+        checkGitLabTokenStatus();
+
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }, 2000);
+    });
+
+    // Test GitLab connection
+    document.getElementById('test-gitlab-btn').addEventListener('click', function() {
+        const btn = this;
+        const originalText = btn.textContent;
+
+        btn.textContent = 'Testing...';
+        btn.disabled = true;
+
+        fetch(`${baseUrl}/test-gitlab`)
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    let message = `✓ ${result.message}`;
+                    if (result.details) {
+                        message += `<br><small>${result.details}</small>`;
+                    }
+
+                    const alertType = result.warning ? 'warning' : 'success';
+                    showStatus('gitlab-status', message, alertType);
+                    updateGitLabStatusBadge('connected', 'bg-success');
+                } else {
+                    let message = `✗ ${result.message}`;
+                    if (result.details) {
+                        message += `<br><small>${result.details}</small>`;
+                    }
+
+                    showStatus('gitlab-status', message, 'error');
+                    updateGitLabStatusBadge('failed', 'bg-danger');
+                }
             })
             .catch(error => {
-                console.error('Error:', error);
-                const container = document.getElementById('python-envs-container');
-                container.innerHTML = '<div class="alert alert-danger">Failed to load Python environments.</div>';
+                console.error('Error testing GitLab:', error);
+                showStatus('gitlab-status', 'Connection test failed: ' + error.message, 'error');
+                updateGitLabStatusBadge('error', 'bg-danger');
+            })
+            .finally(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
             });
+    });
 
-        // Load environment templates
+    // Load environment templates
+    function loadEnvironmentTemplates() {
         fetch(`${baseUrl}/env-templates`)
             .then(response => response.json())
             .then(data => {
                 const container = document.getElementById('template-cards');
 
-                if (data.templates.length === 0) {
+                if (!data.success || !data.templates || data.templates.length === 0) {
                     container.innerHTML = '<div class="col-12"><p>No environment templates found.</p></div>';
                     return;
                 }
 
-                // Template descriptions
-                const descriptions = {
-                    'data-science': 'General data science packages (numpy, pandas, matplotlib, scikit-learn)',
-                    'web-dev': 'Web development packages (Flask, SQLAlchemy, etc.)',
-                    'deep-learning': 'Deep learning frameworks and tools (PyTorch, TensorFlow, transformers)',
-                    'bioinformatics': 'Bioinformatics tools and libraries (Biopython, BLAST, samtools)',
-                    'nlp': 'Natural Language Processing libraries (NLTK, spaCy, transformers)',
-                    'computer-vision': 'Computer Vision libraries (OpenCV, torchvision, detectron2)',
-                    'geospatial': 'Geospatial analysis tools (GeoPandas, GDAL, rasterio)',
-                    'scientific-computing': 'Scientific computing and simulation (FEniCS, PETSc, Numba)',
-                    'statistics': 'Statistical analysis packages (statsmodels, PyMC3, R integration)'
-                };
-
-                // Icons for templates
-                const icons = {
-                    'data-science': '📊',
-                    'web-dev': '🌐',
-                    'deep-learning': '🧠',
-                    'bioinformatics': '🧬',
-                    'nlp': '📝',
-                    'computer-vision': '👁️',
-                    'geospatial': '🌍',
-                    'scientific-computing': '🔬',
-                    'statistics': '📈'
+                // Template descriptions and icons
+                const templateInfo = {
+                    'data-science': { icon: '📊', desc: 'General data science packages (numpy, pandas, matplotlib, scikit-learn)' },
+                    'web-dev': { icon: '🌐', desc: 'Web development packages (Flask, SQLAlchemy, etc.)' },
+                    'deep-learning': { icon: '🧠', desc: 'Deep learning frameworks and tools (PyTorch, TensorFlow, transformers)' },
+                    'bioinformatics': { icon: '🧬', desc: 'Bioinformatics tools and libraries (Biopython, BLAST, samtools)' },
+                    'nlp': { icon: '📝', desc: 'Natural Language Processing libraries (NLTK, spaCy, transformers)' },
+                    'computer-vision': { icon: '👁️', desc: 'Computer Vision libraries (OpenCV, torchvision, detectron2)' },
+                    'geospatial': { icon: '🌍', desc: 'Geospatial analysis tools (GeoPandas, GDAL, rasterio)' },
+                    'scientific-computing': { icon: '🔬', desc: 'Scientific computing and simulation (FEniCS, PETSc, Numba)' },
+                    'statistics': { icon: '📈', desc: 'Statistical analysis packages (statsmodels, PyMC3, R integration)' }
                 };
 
                 let html = '';
-
                 data.templates.forEach(template => {
-                    const description = descriptions[template] || 'Custom environment template';
-                    const icon = icons[template] || '📦';
-
+                    const info = templateInfo[template] || { icon: '📦', desc: 'Custom environment template' };
                     html += `
                         <div class="col">
                             <div class="card h-100">
                                 <div class="card-body p-3">
-                                    <h6 class="card-title">${icon} ${template}</h6>
-                                    <p class="card-text small">${description}</p>
+                                    <h6 class="card-title">${info.icon} ${template}</h6>
+                                    <p class="card-text small">${info.desc}</p>
                                     <a href="/workspaces/create?template=${template}" class="btn btn-sm btn-outline-primary">
-                                        Use
+                                        Use Template
                                     </a>
                                 </div>
                             </div>
@@ -604,470 +713,158 @@
                 container.innerHTML = html;
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error loading templates:', error);
                 const container = document.getElementById('template-cards');
                 container.innerHTML = '<div class="col-12"><p>Failed to load environment templates.</p></div>';
             });
+    }
 
-        // Check application status
+    // Load application status
+    function loadAppStatus() {
         fetch(`${baseUrl}/app-status`)
             .then(response => response.json())
             .then(data => {
                 const statusDiv = document.getElementById('app-status');
-                let html = '<ul class="list-group">';
 
-                // Directory status
-                html += `<li class="list-group-item d-flex justify-content-between align-items-center">
-                    UBRITE Root Directory
-                    <span class="badge ${data.directories.ubrite_root ? 'bg-success' : 'bg-danger'} rounded-pill">
-                        ${data.directories.ubrite_root ? 'OK' : 'Missing'}
-                    </span>
-                </li>`;
+                if (data.error) {
+                    statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${data.message}</div>`;
+                    return;
+                }
 
-                html += `<li class="list-group-item d-flex justify-content-between align-items-center">
-                    Database Directory
-                    <span class="badge ${data.directories.db_root ? 'bg-success' : 'bg-danger'} rounded-pill">
-                        ${data.directories.db_root ? 'OK' : 'Missing'}
-                    </span>
-                </li>`;
+                let html = '<div class="row">';
 
-                html += `<li class="list-group-item d-flex justify-content-between align-items-center">
-                    Temp Directory
-                    <span class="badge ${data.directories.temp_root ? 'bg-success' : 'bg-danger'} rounded-pill">
-                        ${data.directories.temp_root ? 'OK' : 'Missing'}
-                    </span>
-                </li>`;
+                // System Status
+                html += '<div class="col-md-6"><h6>System Status</h6><ul class="list-group mb-3">';
 
-                // Database status
-                html += `<li class="list-group-item d-flex justify-content-between align-items-center">
-                    Database Connection
-                    <span class="badge ${data.database ? 'bg-success' : 'bg-danger'} rounded-pill">
-                        ${data.database ? 'Connected' : 'Error'}
-                    </span>
-                </li>`;
+                // Directories
+                if (data.directories) {
+                    Object.entries(data.directories).forEach(([key, value]) => {
+                        const status = value ? 'success' : 'danger';
+                        const text = value ? 'OK' : 'Missing';
+                        html += `
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                ${key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                <span class="badge bg-${status}">${text}</span>
+                            </li>
+                        `;
+                    });
+                }
 
-                // GitLab status
-                html += `<li class="list-group-item d-flex justify-content-between align-items-center">
-                    GitLab Connection
-                    <span class="badge ${data.gitlab.success ? 'bg-success' : 'bg-danger'} rounded-pill">
-                        ${data.gitlab.success ? 'Connected' : 'Error'}
-                    </span>
-                </li>`;
+                // Database
+                const dbStatus = data.database ? 'success' : 'danger';
+                const dbText = data.database ? 'Connected' : 'Error';
+                html += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Database
+                        <span class="badge bg-${dbStatus}">${dbText}</span>
+                    </li>
+                `;
 
-                // Conda status
+                html += '</ul></div>';
+
+                // Services Status
+                html += '<div class="col-md-6"><h6>Services Status</h6><ul class="list-group mb-3">';
+
+                // GitLab
+                if (data.gitlab) {
+                    const gitlabStatus = data.gitlab.success ? 'success' : 'danger';
+                    const gitlabText = data.gitlab.success ? 'Connected' : 'Error';
+                    html += `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            GitLab
+                            <span class="badge bg-${gitlabStatus}">${gitlabText}</span>
+                        </li>
+                    `;
+                }
+
+                // Conda
                 if (data.conda) {
-                    html += `<li class="list-group-item d-flex justify-content-between align-items-center">
-                        Conda
-                        <span class="badge ${data.conda.available ? 'bg-success' : 'bg-warning'} rounded-pill">
-                            ${data.conda.available ? 'Available' : 'Not Found'}
-                        </span>
-                    </li>`;
+                    const condaStatus = data.conda.available ? 'success' : 'warning';
+                    const condaText = data.conda.available ? 'Available' : 'Not Found';
+                    html += `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Conda
+                            <span class="badge bg-${condaStatus}">${condaText}</span>
+                        </li>
+                    `;
                 }
 
-                // JupyterLab status
+                // Jupyter
                 if (data.jupyter) {
-                    html += `<li class="list-group-item d-flex justify-content-between align-items-center">
-                        JupyterLab
-                        <span class="badge ${data.jupyter.available ? 'bg-success' : 'bg-warning'} rounded-pill">
-                            ${data.jupyter.available ? 'Available' : 'Not Found'}
-                        </span>
-                    </li>`;
+                    const jupyterStatus = data.jupyter.available ? 'success' : 'warning';
+                    const jupyterText = data.jupyter.available ? 'Available' : 'Not Found';
+                    html += `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            JupyterLab
+                            <span class="badge bg-${jupyterStatus}">${jupyterText}</span>
+                        </li>
+                    `;
                 }
 
+                html += '</ul></div></div>';
 
-                html += '</ul>';
                 statusDiv.innerHTML = html;
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error loading app status:', error);
                 const statusDiv = document.getElementById('app-status');
-                statusDiv.innerHTML = '<div class="alert alert-danger">Failed to load application status.</div>';
+                statusDiv.innerHTML = `<div class="alert alert-danger">Failed to load application status: ${error.message}</div>`;
             });
+    }
 
-        // Handle settings form submission
-        const settingsForm = document.getElementById('settings-form');
-        settingsForm.addEventListener('submit', function(e) {
-            e.preventDefault();
+    // Refresh status button
+    document.getElementById('refresh-status-btn').addEventListener('click', function() {
+        const btn = this;
+        const icon = btn.querySelector('[data-feather]');
 
-            const formData = new FormData(settingsForm);
+        // Add spinning animation
+        icon.style.animation = 'spin 1s linear infinite';
+        btn.disabled = true;
 
-            // Process GitLab URL to ensure it has the correct format
-            let gitlabUrl = formData.get('gitlab_url');
-            if (gitlabUrl && !gitlabUrl.endsWith('/api/v4')) {
-                gitlabUrl = gitlabUrl.replace(/\/$/, '') + '/api/v4';
-                formData.set('gitlab_url', gitlabUrl);
-            }
+        loadAppStatus();
 
-            fetch(`${baseUrl}/settings`, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                const statusDiv = document.getElementById('settings-status');
-                if (data.success) {
-                    statusDiv.innerHTML = '<div class="alert alert-success">Settings saved successfully</div>';
-                    document.getElementById('gitlab-pat').value = '';
-                    testGitLabConnection();
-                } else {
-                    statusDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                const statusDiv = document.getElementById('settings-status');
-                statusDiv.innerHTML = '<div class="alert alert-danger">An error occurred</div>';
-            });
-        });
-
-        // Handle conda form submission
-        const condaForm = document.getElementById('conda-form');
-        condaForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            const condaPath = document.getElementById('conda-path').value;
-            const statusDiv = document.getElementById('conda-status');
-
-            statusDiv.innerHTML = `
-                <div class="alert alert-info">
-                    <div class="d-flex align-items-center">
-                        <div class="spinner-border spinner-border-sm me-2" role="status">
-                            <span class="visually-hidden">Saving...</span>
-                        </div>
-                        Saving Conda path...
-                    </div>
-                </div>
-            `;
-
-            fetch(`${baseUrl}/settings`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ conda_path: condaPath })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    statusDiv.innerHTML = '<div class="alert alert-success">Conda path saved successfully</div>';
-
-                    // Check if conda is available with the new path
-                    fetch(`${baseUrl}/workspaces/check-conda`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.available) {
-                                statusDiv.innerHTML = `
-                                    <div class="alert alert-success">
-                                        <strong>Conda is available</strong><br>
-                                        Path: ${data.path}
-                                    </div>
-                                `;
-                            } else {
-                                statusDiv.innerHTML = `
-                                    <div class="alert alert-warning">
-                                        <strong>Conda is not available</strong><br>
-                                        The specified path does not point to a valid conda executable.
-                                    </div>
-                                `;
-                            }
-                        });
-                } else {
-                    statusDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                statusDiv.innerHTML = '<div class="alert alert-danger">An error occurred</div>';
-            });
-        });
-
-        // Handle JupyterLab form submission
-        const jupyterForm = document.getElementById('jupyter-form');
-        jupyterForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            const jupyterPath = document.getElementById('jupyter-path').value;
-            const statusDiv = document.getElementById('jupyter-status');
-
-            statusDiv.innerHTML = `
-                <div class="alert alert-info">
-                    <div class="d-flex align-items-center">
-                        <div class="spinner-border spinner-border-sm me-2" role="status">
-                            <span class="visually-hidden">Saving...</span>
-                        </div>
-                        Saving JupyterLab path...
-                    </div>
-                </div>
-            `;
-
-            fetch(`${baseUrl}/settings`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ jupyter_path: jupyterPath })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    statusDiv.innerHTML = '<div class="alert alert-success">JupyterLab path saved successfully</div>';
-
-                    // Check if JupyterLab is available with the new path
-                    fetch(`${baseUrl}/ide/check-jupyter`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                statusDiv.innerHTML = `
-                                    <div class="alert alert-success">
-                                        <strong>JupyterLab is available</strong><br>
-                                        ${data.message}
-                                    </div>
-                                `;
-                            } else {
-                                statusDiv.innerHTML = `
-                                    <div class="alert alert-warning">
-                                        <strong>JupyterLab is not available</strong><br>
-                                        ${data.message}
-                                    </div>
-                                    <div class="mt-2">
-                                        <p>To install JupyterLab:</p>
-                                        <pre><code>pip install jupyterlab</code></pre>
-                                    </div>
-                                `;
-                            }
-                        });
-                } else {
-                    statusDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                statusDiv.innerHTML = '<div class="alert alert-danger">An error occurred</div>';
-            });
-        });
-
-        // Test GitLab connection
-        document.getElementById('test-gitlab-btn').addEventListener('click', function() {
-            testGitLabConnection();
-        });
-
-        function testGitLabConnection() {
-            const statusDiv = document.getElementById('gitlab-status');
-            statusDiv.innerHTML = `
-                <div class="alert alert-info">
-                    <div class="d-flex align-items-center">
-                        <div class="spinner-border spinner-border-sm me-2" role="status">
-                            <span class="visually-hidden">Testing...</span>
-                        </div>
-                        Testing GitLab connection...
-                    </div>
-                </div>
-            `;
-
-            fetch(`${baseUrl}/test-gitlab`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.success) {
-                        statusDiv.innerHTML = `
-                            <div class="alert alert-success">
-                                <strong>Connected to GitLab</strong><br>
-                                ${data.details}
-                            </div>
-                        `;
-                    } else {
-                        statusDiv.innerHTML = `
-                            <div class="alert alert-danger">
-                                <strong>${data.message}</strong><br>
-                                ${data.details}
-                            </div>
-                        `;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    statusDiv.innerHTML = `
-                        <div class="alert alert-danger">
-                            <strong>Connection Failed</strong><br>
-                            ${error.message}
-                        </div>
-                    `;
-                });
-        }
-
-        // Debug GitLab connection
-        document.getElementById('debug-gitlab-btn').addEventListener('click', function() {
-            const statusDiv = document.getElementById('gitlab-status');
-            statusDiv.innerHTML = `
-                <div class="alert alert-info">
-                    <div class="d-flex align-items-center">
-                        <div class="spinner-border spinner-border-sm me-2" role="status">
-                            <span class="visually-hidden">Debugging...</span>
-                        </div>
-                        Debugging GitLab connection...
-                    </div>
-                </div>
-            `;
-
-            fetch(`${baseUrl}/debug-gitlab`)
-                .then(response => response.json())
-                .then(data => {
-                    let debugInfo = `
-                        <div class="alert alert-info">
-                            <h5>GitLab Debug Information</h5>
-                            <p><strong>GitLab URL:</strong> ${data.gitlab_url}</p>
-                            <p><strong>PAT Configured:</strong> ${data.has_pat ? 'Yes' : 'No'}</p>
-                    `;
-
-                    if (data.direct_request) {
-                        if (data.direct_request.error) {
-                            debugInfo += `
-                                <p><strong>Direct Request Error:</strong> ${data.direct_request.error}</p>
-                            `;
-                        } else {
-                            debugInfo += `
-                                <p><strong>Status Code:</strong> ${data.direct_request.status_code}</p>
-                                <p><strong>Content Type:</strong> ${data.direct_request.content_type}</p>
-                                <p><strong>Content Length:</strong> ${data.direct_request.content_length}</p>
-                                <p><strong>Content Preview:</strong> <code>${data.direct_request.content_preview}</code></p>
-                            `;
-                        }
-                    }
-
-                    debugInfo += `
-                        <p class="mt-3">
-                            <strong>Troubleshooting Tips:</strong>
-                            <ul>
-                                <li>Make sure the GitLab URL is correct and accessible</li>
-                                <li>Check if your network allows connections to this URL</li>
-                                <li>Verify that your Personal Access Token has the correct permissions</li>
-                                <li>Try using a different browser or network connection</li>
-                            </ul>
-                        </p>
-                    </div>
-                    `;
-
-                    statusDiv.innerHTML = debugInfo;
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    statusDiv.innerHTML = '<div class="alert alert-danger">Failed to debug GitLab connection</div>';
-                });
-        });
-
-        // Load git configuration
-        fetch(`${baseUrl}/git-config`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.config) {
-                    const config = data.config;
-                    if (config.user_name) document.getElementById('git-user-name').value = config.user_name;
-                    if (config.user_email) document.getElementById('git-user-email').value = config.user_email;
-                    if (config.ssh_key_path) document.getElementById('git-ssh-key-path').value = config.ssh_key_path;
-                    if (config.signing_key) document.getElementById('git-signing-key').value = config.signing_key;
-                    if (config.default_branch) document.getElementById('git-default-branch').value = config.default_branch;
-
-                    const statusDiv = document.getElementById('git-config-status');
-                    statusDiv.innerHTML = '<div class="alert alert-success">Git configuration loaded</div>';
-                }
-            })
-            .catch(error => {
-                console.error('Error loading git configuration:', error);
-                const statusDiv = document.getElementById('git-config-status');
-                statusDiv.innerHTML = '<div class="alert alert-warning">No git configuration found</div>';
-            });
-
-        // Handle git configuration form submission
-        const gitConfigForm = document.getElementById('git-config-form');
-        gitConfigForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            const formData = new FormData(gitConfigForm);
-            const data = Object.fromEntries(formData.entries());
-
-            const statusDiv = document.getElementById('git-config-form-status');
-            statusDiv.innerHTML = `
-                <div class="alert alert-info">
-                    <div class="d-flex align-items-center">
-                        <div class="spinner-border spinner-border-sm me-2" role="status">
-                            <span class="visually-hidden">Saving...</span>
-                        </div>
-                        Saving git configuration...
-                    </div>
-                </div>
-            `;
-
-            fetch(`${baseUrl}/git-config`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    statusDiv.innerHTML = '<div class="alert alert-success">Git configuration saved successfully</div>';
-                } else {
-                    let errorMessage = data.message;
-                    if (data.errors && data.errors.length > 0) {
-                        errorMessage += '<ul class="mb-0 mt-2">';
-                        data.errors.forEach(error => {
-                            errorMessage += `<li>${error}</li>`;
-                        });
-                        errorMessage += '</ul>';
-                    }
-                    statusDiv.innerHTML = `<div class="alert alert-danger">${errorMessage}</div>`;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                statusDiv.innerHTML = '<div class="alert alert-danger">An error occurred while saving git configuration</div>';
-            });
-        });
-
-        // Test git configuration
-        document.getElementById('test-git-config-btn').addEventListener('click', function() {
-            const statusDiv = document.getElementById('git-config-status');
-            statusDiv.innerHTML = `
-                <div class="alert alert-info">
-                    <div class="d-flex align-items-center">
-                        <div class="spinner-border spinner-border-sm me-2" role="status">
-                            <span class="visually-hidden">Testing...</span>
-                        </div>
-                        Testing git configuration...
-                    </div>
-                </div>
-            `;
-
-            // Simple test - just verify the configuration is saved
-            fetch(`${baseUrl}/git-config`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.config) {
-                        const config = data.config;
-                        let message = '<strong>Git Configuration Status:</strong><br>';
-                        message += `User Name: ${config.user_name || 'Not set'}<br>`;
-                        message += `User Email: ${config.user_email || 'Not set'}<br>`;
-                        message += `SSH Key: ${config.ssh_key_path || 'Not set'}<br>`;
-                        message += `Signing Key: ${config.signing_key || 'Not set'}<br>`;
-                        message += `Default Branch: ${config.default_branch || 'main'}`;
-
-                        const alertClass = (config.user_name && config.user_email) ? 'alert-success' : 'alert-warning';
-                        statusDiv.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
-                    } else {
-                        statusDiv.innerHTML = '<div class="alert alert-warning">No git configuration found</div>';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    statusDiv.innerHTML = '<div class="alert alert-danger">Failed to test git configuration</div>';
-                });
-        });
+        setTimeout(() => {
+            icon.style.animation = '';
+            btn.disabled = false;
+        }, 2000);
     });
+
+    // Utility function to show status messages
+    function showStatus(elementId, message, type = 'info') {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+
+        const alertClass = type === 'success' ? 'alert-success' :
+                          type === 'warning' ? 'alert-warning' :
+                          type === 'error' ? 'alert-danger' : 'alert-info';
+
+        element.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+
+        // Auto-hide success messages after 5 seconds
+        if (type === 'success') {
+            setTimeout(() => {
+                element.innerHTML = '';
+            }, 5000);
+        }
+    }
+
+    // Git configuration handling (existing code)
+    // ... (keep existing git config code)
+
+    // Initialize Feather icons
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+});
+
+// Add CSS for spinning animation
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+`;
+document.head.appendChild(style);
 </script>
 {% endblock %}

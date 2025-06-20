@@ -1,4 +1,4 @@
-// Socket.IO setup
+// Socket.IO setup and global functionality
 document.addEventListener("DOMContentLoaded", () => {
   // Initialize Feather icons
   if (typeof feather !== "undefined") {
@@ -10,7 +10,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (typeof io !== "undefined") {
     socket = io()
 
-    // Global event listeners
     socket.on("connect", () => {
       console.log("Connected to Socket.IO server")
     })
@@ -20,16 +19,86 @@ document.addEventListener("DOMContentLoaded", () => {
     })
   } else {
     console.warn("Socket.IO not available")
-    // Create a dummy socket object to prevent errors
     socket = {
-      on: () => {
-        console.warn("Socket.IO not available")
-      },
-      emit: () => {
-        console.warn("Socket.IO not available")
-      },
+      on: () => console.warn("Socket.IO not available"),
+      emit: () => console.warn("Socket.IO not available"),
     }
   }
+
+  // Global GitLab token expiration checker
+  function checkGitLabTokenExpiration() {
+    fetch("/gitlab-status")
+      .then((response) => response.json())
+      .then((status) => {
+        if (status.error_code === "TOKEN_EXPIRED") {
+          showGlobalAlert("GitLab token has expired. Please update your token.", "error", {
+            action: "Update Token",
+            callback: () => (window.location.href = "/#gitlab-config"),
+          })
+        } else if (status.error_code === "TOKEN_EXPIRING_SOON") {
+          showGlobalAlert("GitLab token expires soon. Consider updating it.", "warning", {
+            action: "Update Token",
+            callback: () => (window.location.href = "/#gitlab-config"),
+          })
+        }
+      })
+      .catch((error) => {
+        console.warn("Could not check GitLab token status:", error)
+      })
+  }
+
+  // Check token status on page load and periodically
+  checkGitLabTokenExpiration()
+  setInterval(checkGitLabTokenExpiration, 300000) // Every 5 minutes
+
+  // Global alert system
+  function showGlobalAlert(message, type = "info", options = {}) {
+    // Remove existing global alerts
+    const existingAlerts = document.querySelectorAll(".global-alert")
+    existingAlerts.forEach((alert) => alert.remove())
+
+    // Create alert element
+    const alertDiv = document.createElement("div")
+    alertDiv.className = `alert alert-${type === "error" ? "danger" : type} alert-dismissible fade show global-alert`
+    alertDiv.style.cssText = "position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px;"
+
+    let alertHTML = `
+      <div class="d-flex align-items-center">
+        <div class="flex-grow-1">${message}</div>
+        <button type="button" class="btn-close ms-2" data-bs-dismiss="alert"></button>
+      </div>
+    `
+
+    if (options.action && options.callback) {
+      alertHTML = `
+        <div>${message}</div>
+        <hr>
+        <div class="d-flex justify-content-between">
+          <button type="button" class="btn btn-sm btn-${type === "error" ? "danger" : type}" onclick="(${options.callback.toString()})()">
+            ${options.action}
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+            Dismiss
+          </button>
+        </div>
+      `
+    }
+
+    alertDiv.innerHTML = alertHTML
+    document.body.appendChild(alertDiv)
+
+    // Auto-dismiss after 10 seconds for warnings, 15 for errors
+    const timeout = type === "error" ? 15000 : 10000
+    setTimeout(() => {
+      if (alertDiv.parentNode) {
+        alertDiv.remove()
+      }
+    }, timeout)
+  }
+
+  // Make global functions available
+  window.showGlobalAlert = showGlobalAlert
+  window.checkGitLabTokenExpiration = checkGitLabTokenExpiration
 
   // Analytics tracking
   function trackEvent(eventName, payload) {
@@ -37,118 +106,24 @@ document.addEventListener("DOMContentLoaded", () => {
       payload = {}
     }
 
-    // Add timestamp
     payload.timestamp = new Date().toISOString()
 
-    // Send to server (if needed)
     if (socket && typeof socket.emit === "function") {
       // socket.emit('track_event', { event: eventName, payload: payload });
     }
 
-    // Log to console in development
     console.log(`[Analytics] ${eventName}:`, payload)
   }
 
-  // Expose to global scope
   window.trackEvent = trackEvent
-
-  // Load app status function (existing functionality)
-  function loadAppStatus() {
-    // Use the new API client if available, otherwise fall back to fetch
-    const apiCall = window.API ? window.API.system.health : () => fetch("/app-status").then((r) => r.json())
-
-    apiCall()
-      .then((data) => {
-        if (data.error) {
-          console.error("Error loading app status:", data.error)
-          const container = document.getElementById("app-status-container")
-          if (container) {
-            container.innerHTML = `<div class="alert alert-danger">Error loading application status: ${data.message}</div>`
-          }
-          return
-        }
-
-        // Update directory status
-        updateStatusSection("directory-status", data.directories)
-
-        // Update database status
-        updateStatusIndicator("database-status", data.database)
-
-        // Update GitLab status
-        updateStatusIndicator("gitlab-status", data.gitlab)
-
-        // Update Conda status
-        if (data.conda) {
-          updateStatusIndicator("conda-status", data.conda.available)
-          const condaPath = document.getElementById("conda-path")
-          if (condaPath) condaPath.textContent = data.conda.path
-        } else {
-          updateStatusIndicator("conda-status", false)
-          const condaPath = document.getElementById("conda-path")
-          if (condaPath) condaPath.textContent = "Unknown"
-        }
-
-        // Update Jupyter status
-        if (data.jupyter) {
-          updateStatusIndicator("jupyter-status", data.jupyter.available)
-          const jupyterPath = document.getElementById("jupyter-path")
-          if (jupyterPath) jupyterPath.textContent = data.jupyter.path
-          if (data.jupyter.message) {
-            const jupyterMessage = document.getElementById("jupyter-message")
-            if (jupyterMessage) jupyterMessage.textContent = data.jupyter.message
-          }
-        } else {
-          updateStatusIndicator("jupyter-status", false)
-          const jupyterPath = document.getElementById("jupyter-path")
-          if (jupyterPath) jupyterPath.textContent = "Unknown"
-        }
-      })
-      .catch((error) => {
-        console.error("Error fetching app status:", error)
-        const container = document.getElementById("app-status-container")
-        if (container) {
-          container.innerHTML = `<div class="alert alert-danger">Failed to load application status: ${error.message}</div>`
-        }
-      })
-  }
-
-  // Helper function to update status indicators
-  function updateStatusIndicator(elementId, status) {
-    const element = document.getElementById(elementId)
-    if (!element) return
-
-    if (status) {
-      element.innerHTML = '<span class="badge bg-success">OK</span>'
-    } else {
-      element.innerHTML = '<span class="badge bg-danger">Failed</span>'
-    }
-  }
-
-  // Helper function to update status sections
-  function updateStatusSection(elementId, statuses) {
-    const element = document.getElementById(elementId)
-    if (!element) return
-
-    let html = ""
-    for (const [key, value] of Object.entries(statuses)) {
-      const status = value ? '<span class="badge bg-success">OK</span>' : '<span class="badge bg-danger">Failed</span>'
-      html += `<div class="mb-2">${key}: ${status}</div>`
-    }
-    element.innerHTML = html
-  }
-
-  // Expose loadAppStatus to global scope for existing functionality
-  window.loadAppStatus = loadAppStatus
 
   // Initialize page-specific functionality
   initializePageFunctionality()
 })
 
 function initializePageFunctionality() {
-  // Get current page context
   const currentPath = window.location.pathname
 
-  // Initialize based on current page
   if (currentPath === "/" || currentPath.includes("dashboard")) {
     initializeDashboard()
   } else if (currentPath.includes("workspaces")) {
@@ -159,23 +134,15 @@ function initializePageFunctionality() {
 }
 
 function initializeDashboard() {
-  // Load app status if on dashboard
-  if (typeof loadAppStatus === "function") {
-    loadAppStatus()
-  }
+  console.log("Initializing dashboard")
 
-  // Initialize git configuration form if present
-  const gitConfigForm = document.getElementById("git-config-form")
-  if (gitConfigForm) {
-    gitConfigForm.addEventListener("submit", handleGitConfigSubmit)
-  }
+  // Dashboard-specific initialization is handled in the template script
+  // This function is kept for consistency and future enhancements
 }
 
 function initializeWorkspaces() {
-  // Initialize workspace-specific functionality
   console.log("Initializing workspaces page")
 
-  // Add event listeners for workspace operations
   const createWorkspaceBtn = document.getElementById("create-workspace-btn")
   if (createWorkspaceBtn) {
     createWorkspaceBtn.addEventListener("click", handleCreateWorkspace)
@@ -183,42 +150,11 @@ function initializeWorkspaces() {
 }
 
 function initializeFileExplorer() {
-  // Initialize file explorer functionality
   console.log("Initializing file explorer")
 
-  // Get workspace ID from URL
   const workspaceId = getWorkspaceIdFromURL()
   if (workspaceId) {
-    // Initialize file explorer for this workspace
     setupFileExplorerEvents(workspaceId)
-  }
-}
-
-// Git configuration handling
-async function handleGitConfigSubmit(event) {
-  event.preventDefault()
-
-  if (!window.API) {
-    console.error("API client not available")
-    return
-  }
-
-  const formData = new FormData(event.target)
-  const gitConfig = {
-    git_user_name: formData.get("git_user_name"),
-    git_user_email: formData.get("git_user_email"),
-    git_ssh_key_path: formData.get("git_ssh_key_path"),
-    git_gpg_key: formData.get("git_gpg_key"),
-    git_default_branch: formData.get("git_default_branch"),
-  }
-
-  try {
-    showStatus("git-config-status", "Saving configuration...", "loading")
-    await window.API.git.config.update(gitConfig)
-    showStatus("git-config-status", "Git configuration saved successfully!", "success")
-  } catch (error) {
-    const message = handleAPIError(error, "saving git configuration")
-    showStatus("git-config-status", message, "error")
   }
 }
 
@@ -231,7 +167,6 @@ async function handleCreateWorkspace(event) {
     return
   }
 
-  // Get form data (assuming there's a form)
   const form = document.getElementById("create-workspace-form")
   if (!form) return
 
@@ -247,7 +182,6 @@ async function handleCreateWorkspace(event) {
     const workspace = await window.API.workspaces.create(workspaceData)
     showStatus("workspace-status", "Workspace created successfully!", "success")
 
-    // Redirect to workspace detail page
     setTimeout(() => {
       window.location.href = `/workspaces/${workspace.id}`
     }, 2000)
@@ -257,7 +191,7 @@ async function handleCreateWorkspace(event) {
   }
 }
 
-// JupyterLab launch function (existing functionality)
+// JupyterLab launch function
 async function launchJupyterLab(workspaceId) {
   if (!window.API) {
     console.error("API client not available")
@@ -271,7 +205,6 @@ async function launchJupyterLab(workspaceId) {
     if (result.success) {
       showStatus("jupyter-status", `JupyterLab launched successfully! Access it at: ${result.url}`, "success")
 
-      // Open JupyterLab in new tab after a short delay
       setTimeout(() => {
         window.open(result.url, "_blank")
       }, 2000)
@@ -286,13 +219,11 @@ async function launchJupyterLab(workspaceId) {
 
 // File explorer setup
 function setupFileExplorerEvents(workspaceId) {
-  // Launch JupyterLab button
   const launchJupyterBtn = document.getElementById("launch-jupyter-btn")
   if (launchJupyterBtn) {
     launchJupyterBtn.addEventListener("click", () => launchJupyterLab(workspaceId))
   }
 
-  // Check JupyterLab installation button
   const checkJupyterBtn = document.getElementById("check-jupyter-btn")
   if (checkJupyterBtn) {
     checkJupyterBtn.addEventListener("click", () => checkJupyterInstallation(workspaceId))
@@ -331,17 +262,14 @@ function showStatus(elementId, message, type = "info") {
   const element = document.getElementById(elementId)
   if (!element) return
 
-  // Clear existing content
   element.innerHTML = ""
 
-  // Create status message
   const statusDiv = document.createElement("div")
   statusDiv.className = `alert alert-${getBootstrapClass(type)} mt-2`
   statusDiv.textContent = message
 
   element.appendChild(statusDiv)
 
-  // Auto-hide success messages after 5 seconds
   if (type === "success") {
     setTimeout(() => {
       if (statusDiv.parentNode) {

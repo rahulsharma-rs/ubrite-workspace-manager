@@ -19,14 +19,14 @@ if 'PYTHONHOME' in os.environ:
     del os.environ['PYTHONHOME']
 
 # —————————————————————————————————————————————————
-# 3) re-exec under the venv’s python3 if we’re not already
+# 3) re-exec under the venv's python3 if we're not already
 # —————————————————————————————————————————————————
 python3_bin = os.path.join(venv_dir, 'bin', 'python3')
 if sys.executable != python3_bin:
     os.execl(python3_bin, python3_bin, *sys.argv)
 
 # —————————————————————————————————————————————————
-# 4) insert the venv’s site-packages on sys.path
+# 4) insert the venv's site-packages on sys.path
 # —————————————————————————————————————————————————
 ver = str(sys.version_info[0]) + '.' + str(sys.version_info[1])
 site_packages = os.path.join(venv_dir, 'lib', 'python' + ver, 'site-packages')

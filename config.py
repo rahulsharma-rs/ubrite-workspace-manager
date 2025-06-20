@@ -1,93 +1,90 @@
 import os
 from datetime import timedelta
 
+# Get the current user from environment
+USER = os.environ.get('USER', 'default_user')
+BASE_PATH = f'/data/user/{USER}/ondemand/dev'
+
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'hard-to-guess-string'
+    """Base configuration class."""
+
+    # Flask settings
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
+
+    # Database settings
+    UBRITE_ROOT = os.path.join(BASE_PATH, 'ubrite_workspaces')
+    DB_ROOT = os.path.join(BASE_PATH, 'ubrite_databases')
+    SQLALCHEMY_DATABASE_URI = f'sqlite:///{os.path.join(DB_ROOT, "ubrite.db")}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # Get username from environment
-    user = os.environ.get('USER') or 'default_user'
+    # File upload settings
+    MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB max file size
+    UPLOAD_FOLDER = os.path.join(UBRITE_ROOT, 'uploads')
 
-    # Base path for all application data
-    BASE_PATH = f'/data/user/{user}/ondemand/dev'
+    # Session settings
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=24)
+    SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
 
-    # Base directories
-    UBRITE_ROOT = os.environ.get('UBRITE_ROOT') or os.path.join(BASE_PATH, 'UBRITE')
-    DB_ROOT = os.environ.get('DB_ROOT') or os.path.join(BASE_PATH, 'DB')
-    TEMP_ROOT = os.environ.get('TEMP_ROOT') or os.path.join(BASE_PATH, 'UBRITE_TEMP')
+    # CSRF settings
+    WTF_CSRF_TIME_LIMIT = None
+    WTF_CSRF_SSL_STRICT = False
 
-    # Subdirectories
-    LOGS_DIR = os.path.join(TEMP_ROOT, 'logs')
-    CACHE_DIR = os.path.join(TEMP_ROOT, 'cache')
-    UPLOADS_DIR = os.path.join(TEMP_ROOT, 'uploads')
+    # Logging
+    LOGS_DIR = os.path.join(BASE_PATH, 'logs')
 
-    # CORS Configuration
-    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*').split(',')
-    CORS_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-    CORS_ALLOW_HEADERS = ['Content-Type', 'Authorization', 'X-Requested-With']
-
-    # API Configuration
-    API_BASE_URL = os.environ.get('API_BASE_URL') or 'http://localhost:5000'
-    FRONTEND_URL = os.environ.get('FRONTEND_URL') or 'http://localhost:3000'
-
-    # GitLab configuration
-    GITLAB_API_URL = os.environ.get('GITLAB_API_URL') or 'https://gitlab.com/api/v4'
-
-    # Tool paths
-    CONDA_PATH = os.environ.get('CONDA_PATH') or 'conda'
-    JUPYTER_PATH = os.environ.get('JUPYTER_PATH') or 'jupyter'
-    VSCODE_PATH = os.environ.get('VSCODE_PATH') or 'code-server'
-
-    # Templates
-    ENV_TEMPLATES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'env_templates')
-
-    # Features
+    # Analytics
     ANALYTICS_ENABLED = True
 
-    @staticmethod
-    def init_app(app):
-        """Initialize application-specific configuration."""
-        # Ensure all directories exist
-        directories = [
-            Config.UBRITE_ROOT,
-            Config.DB_ROOT,
-            Config.TEMP_ROOT,
-            Config.LOGS_DIR,
-            Config.CACHE_DIR,
-            Config.UPLOADS_DIR
-        ]
+    # CORS settings for OnDemand
+    CORS_ORIGINS = ['*']  # Adjust as needed for security
+    CORS_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    CORS_ALLOW_HEADERS = ['Content-Type', 'Authorization', 'X-CSRFToken']
 
-        for directory in directories:
-            os.makedirs(directory, exist_ok=True)
+    # API settings
+    API_BASE_URL = f'/pun/dev/rc_workspace'  # OnDemand path
+
+    # External service settings
+    GITLAB_URL = os.environ.get('GITLAB_URL', 'https://gitlab.rc.uab.edu')
+    GITLAB_TOKEN = os.environ.get('GITLAB_TOKEN', '')
+
+    # Conda settings
+    CONDA_PATH = os.environ.get('CONDA_PATH', '/opt/miniconda3/bin/conda')
+
+    # Jupyter settings
+    JUPYTER_PATH = os.environ.get('JUPYTER_PATH', '/opt/miniconda3/bin/jupyter')
+
+    # Git settings
+    GIT_USER_NAME = os.environ.get('GIT_USER_NAME', '')
+    GIT_USER_EMAIL = os.environ.get('GIT_USER_EMAIL', '')
 
 
 class DevelopmentConfig(Config):
+    """Development configuration."""
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{os.path.join(Config.BASE_PATH, "dev.db")}'
-    # Allow all origins in development
-    CORS_ORIGINS = ['*']
-
-
-class TestingConfig(Config):
-    TESTING = True
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
-    WTF_CSRF_ENABLED = False
-    ANALYTICS_ENABLED = False
-    CORS_ORIGINS = ['*']
+    TESTING = False
 
 
 class ProductionConfig(Config):
+    """Production configuration."""
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        'DATABASE_URL') or f'sqlite:///{os.path.join(Config.BASE_PATH, "ubrite.db")}'
-    # Restrict origins in production
-    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', 'https://yourdomain.com').split(',')
+    TESTING = False
+    SESSION_COOKIE_SECURE = True  # Enable in production with HTTPS
 
 
+class TestingConfig(Config):
+    """Testing configuration."""
+    TESTING = True
+    DEBUG = True
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+
+
+# Configuration dictionary
 config = {
     'development': DevelopmentConfig,
-    'testing': TestingConfig,
     'production': ProductionConfig,
+    'testing': TestingConfig,
     'default': DevelopmentConfig
 }

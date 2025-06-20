@@ -13,8 +13,12 @@ import json
 from datetime import datetime
 
 workspaces_bp = Blueprint('workspaces', __name__)
-analytics_service = AnalyticsService()
 logger = logging.getLogger(__name__)
+
+
+def get_analytics_service():
+    """Get analytics service instance."""
+    return AnalyticsService()
 
 
 @workspaces_bp.route('/')
@@ -85,14 +89,28 @@ def create_workspace_post():
         if create_gitlab_repo:
             try:
                 gitlab_service = GitLabService()
-                repo_data = gitlab_service.create_repository(name, f"UBRITE workspace: {name}")
+
+                # Check if GitLab is properly configured first
+                token_status = gitlab_service.check_token_status()
+                if not token_status.get('valid', False):
+                    logger.warning(f"GitLab not properly configured: {token_status.get('message')}")
+                    return jsonify({
+                        'success': False,
+                        'message': f'GitLab repository creation failed: {token_status.get("message", "Token not configured")}'
+                    }), 400
+
+                repo_data = gitlab_service.create_repository(name, 'private')
                 if repo_data:
                     gitlab_repo_id = repo_data.get('id')
                     gitlab_repo_url = repo_data.get('web_url')
                     workspace.gitlab_repo_id = gitlab_repo_id
                     workspace.gitlab_repo_url = gitlab_repo_url
+                else:
+                    logger.warning("Failed to create GitLab repository - no data returned")
+
             except Exception as e:
                 logger.warning(f"Failed to create GitLab repository: {str(e)}")
+                # Don't fail the entire workspace creation if GitLab fails
 
         db.session.add(workspace)
         db.session.commit()
@@ -141,7 +159,7 @@ def create_workspace_post():
         })
 
         # Track analytics
-        analytics_service.track_event('workspace_created', {
+        get_analytics_service().track_event('workspace_created', {
             'ws_id': workspace.id,
             'env_type': env_type,
             'gitlab_repo': gitlab_repo_id is not None
@@ -229,7 +247,7 @@ def delete_workspace(workspace_id):
         db.session.commit()
 
         # Track analytics
-        analytics_service.track_event('workspace_deleted', {
+        get_analytics_service().track_event('workspace_deleted', {
             'ws_id': workspace_id
         })
 

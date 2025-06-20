@@ -1,91 +1,46 @@
-import sqlite3
-from flask import current_app
-import os
-import logging
-from extensions import db
-
-
 def run_migrations():
-    """Run database migrations to update schema."""
-    print("Running database migrations...")
-
+    """Run database migrations to ensure schema is up to date."""
     try:
-        # First, create all tables if they don't exist
-        db.create_all()
+        # Check if gitlab_url column exists in settings table
+        inspector = db.inspect(db.engine)
+        settings_columns = [col['name'] for col in inspector.get_columns('settings')]
 
-        # Get database path from SQLAlchemy URI
-        db_uri = current_app.config['SQLALCHEMY_DATABASE_URI']
-        if db_uri.startswith('sqlite:///'):
-            db_path = db_uri[10:]  # Remove 'sqlite:///' prefix
-        else:
-            print("Unsupported database type for migrations")
-            return
-
-        # Check if database file exists
-        if not os.path.exists(db_path):
-            print(f"Database file not found: {db_path}")
-            return
-
-        # Connect to the database
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-
-        # Migration 1: Add gitlab_url column to settings table if it doesn't exist
-        try:
-            # Check if the column exists
-            cursor.execute("PRAGMA table_info(settings)")
-            columns = [column[1] for column in cursor.fetchall()]
-
-            if 'gitlab_url' not in columns:
-                print("Adding gitlab_url column to settings table")
-                cursor.execute("ALTER TABLE settings ADD COLUMN gitlab_url VARCHAR(255)")
+        if 'gitlab_url' not in settings_columns:
+            logger.info("Adding gitlab_url column to settings table")
+            with db.engine.connect() as conn:
+                conn.execute('ALTER TABLE settings ADD COLUMN gitlab_url VARCHAR(255)')
                 conn.commit()
-        except Exception as e:
-            print(f"Error in migration 1: {str(e)}")
+            logger.info("Added gitlab_url column successfully")
 
-        # Migration 2: Add git configuration columns to settings table
-        git_settings_columns = [
-            ('git_user_name', 'VARCHAR(255)'),
-            ('git_user_email', 'VARCHAR(255)'),
-            ('git_ssh_key_path', 'VARCHAR(255)'),
-            ('git_signing_key', 'VARCHAR(255)'),
-            ('git_default_branch', 'VARCHAR(100) DEFAULT "main"')
-        ]
+        # Check if git configuration columns exist
+        git_columns = ['git_user_name', 'git_user_email', 'git_ssh_key_path',
+                       'git_signing_key', 'git_default_branch']
 
-        for column_name, column_type in git_settings_columns:
-            try:
-                cursor.execute("PRAGMA table_info(settings)")
-                columns = [column[1] for column in cursor.fetchall()]
-
-                if column_name not in columns:
-                    print(f"Adding {column_name} column to settings table")
-                    cursor.execute(f"ALTER TABLE settings ADD COLUMN {column_name} {column_type}")
+        for col in git_columns:
+            if col not in settings_columns:
+                logger.info(f"Adding {col} column to settings table")
+                with db.engine.connect() as conn:
+                    if col == 'git_default_branch':
+                        conn.execute(f'ALTER TABLE settings ADD COLUMN {col} VARCHAR(100) DEFAULT "main"')
+                    else:
+                        conn.execute(f'ALTER TABLE settings ADD COLUMN {col} VARCHAR(255)')
                     conn.commit()
-            except Exception as e:
-                print(f"Error adding {column_name} column: {str(e)}")
+                logger.info(f"Added {col} column successfully")
 
-        # Migration 3: Add git override columns to workspace table
-        git_workspace_columns = [
-            ('git_user_name_override', 'VARCHAR(255)'),
-            ('git_user_email_override', 'VARCHAR(255)')
-        ]
+        # Check if workspace git override columns exist
+        workspace_columns = [col['name'] for col in inspector.get_columns('workspace')]
+        git_override_columns = ['git_user_name_override', 'git_user_email_override']
 
-        for column_name, column_type in git_workspace_columns:
-            try:
-                cursor.execute("PRAGMA table_info(workspace)")
-                columns = [column[1] for column in cursor.fetchall()]
-
-                if column_name not in columns:
-                    print(f"Adding {column_name} column to workspace table")
-                    cursor.execute(f"ALTER TABLE workspace ADD COLUMN {column_name} {column_type}")
+        for col in git_override_columns:
+            if col not in workspace_columns:
+                logger.info(f"Adding {col} column to workspace table")
+                with db.engine.connect() as conn:
+                    conn.execute(f'ALTER TABLE workspace ADD COLUMN {col} VARCHAR(255)')
                     conn.commit()
-            except Exception as e:
-                print(f"Error adding {column_name} column: {str(e)}")
+                logger.info(f"Added {col} column successfully")
 
-        # Close the connection
-        conn.close()
-        print("Database migrations completed")
+        logger.info("Database migrations completed successfully")
 
     except Exception as e:
-        print(f"Error running migrations: {str(e)}")
-        logging.error(f"Database migration error: {str(e)}")
+        logger.error(f"Error running database migrations: {str(e)}")
+        # Don't fail completely, just log the error

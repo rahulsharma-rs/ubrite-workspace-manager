@@ -12,9 +12,25 @@ import json
 from datetime import datetime
 
 
-def create_app(config_name='default'):
+def create_app(config_name=None):
     app = Flask(__name__)
-    app.config.from_object(config[config_name])
+
+    # Determine config name from environment if not provided
+    if config_name is None:
+        config_name = os.environ.get('FLASK_ENV', 'default')
+
+    # Load configuration
+    try:
+        app.config.from_object(config[config_name])
+    except KeyError:
+        # Fallback to default config if specified config doesn't exist
+        app.config.from_object(config['default'])
+
+    # Set default values for missing config keys
+    app.config.setdefault('ANALYTICS_ENABLED', True)
+    app.config.setdefault('CORS_ORIGINS', ['*'])
+    app.config.setdefault('CORS_METHODS', ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+    app.config.setdefault('CORS_ALLOW_HEADERS', ['Content-Type', 'Authorization', 'X-CSRFToken'])
 
     # Initialize CSRF protection
     csrf = CSRFProtect(app)
@@ -134,16 +150,19 @@ def create_app(config_name='default'):
     with app.app_context():
         try:
             # Ensure directories exist first
+            from utils.filesystem import ensure_directories
             ensure_directories(log_initialization=True)
 
             # Create the database tables
             db.create_all()
 
             # Run database migrations
+            from utils.db_migrations import run_migrations
             run_migrations()
 
         except Exception as e:
-            logging.error(f"Error during app initialization: {str(e)}")
+            app.logger.error(f"Error during app initialization: {str(e)}")
+        # Don't fail completely, just log the error
 
     return app
 

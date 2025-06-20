@@ -1,118 +1,53 @@
 import os
-import json
-import logging
 import shutil
-from datetime import datetime
+import logging
 from flask import current_app
-from models import AuditLog, Workspace
+from models import AuditLog
 from extensions import db
-import subprocess
+import json
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
-def ensure_directories(log_initialization=True):
+def ensure_directories(log_initialization=False):
     """Ensure all required directories exist."""
     directories = [
         current_app.config['UBRITE_ROOT'],
         current_app.config['DB_ROOT'],
-        current_app.config['TEMP_ROOT'],
-        current_app.config['LOGS_DIR'],
-        current_app.config['CACHE_DIR'],
-        current_app.config['UPLOADS_DIR']
+        current_app.config.get('LOGS_DIR', '/tmp/ubrite_logs'),
+        current_app.config.get('UPLOAD_FOLDER', os.path.join(current_app.config['UBRITE_ROOT'], 'uploads')),
+        os.path.join(current_app.config['UBRITE_ROOT'], '.config')
     ]
 
+    created_dirs = []
     for directory in directories:
-        try:
-            os.makedirs(directory, exist_ok=True)
-            logging.info(f"Ensured directory exists: {directory}")
-
-            # Create .gitkeep file
-            gitkeep_file = os.path.join(directory, '.gitkeep')
-            if not os.path.exists(gitkeep_file):
-                with open(gitkeep_file, 'w') as f:
-                    f.write('')
-
-        except Exception as e:
-            logging.error(f"Failed to create directory {directory}: {str(e)}")
-            raise
-
-    # Log initialization if requested
-    if log_initialization:
-        init_file = os.path.join(current_app.config['UBRITE_ROOT'], '.initialized')
-        if not os.path.exists(init_file):
+        if not os.path.exists(directory):
             try:
-                with open(init_file, 'w') as f:
-                    f.write(str(datetime.utcnow().isoformat()))
-                log_event(None, 'system_initialized', {
-                    'directories_created': len(directories),
-                    'timestamp': datetime.utcnow().isoformat()
-                })
+                os.makedirs(directory, exist_ok=True)
+                created_dirs.append(directory)
+                if log_initialization:
+                    logger.info(f"Created directory: {directory}")
             except Exception as e:
-                logging.warning(f"Could not log initialization: {str(e)}")
+                logger.error(f"Failed to create directory {directory}: {str(e)}")
+                return False
+
+    if log_initialization and created_dirs:
+        logger.info(f"Initialized {len(created_dirs)} directories")
+
+    return True
 
 
-def create_workspace_directories(workspace_name):
-    """Create the directory structure for a new workspace."""
-    ubrite_root = current_app.config['UBRITE_ROOT']
-    db_root = current_app.config['DB_ROOT']
+def get_directory_status():
+    """Get the status of all required directories."""
+    directories = {
+        'ubrite_root': os.path.exists(current_app.config['UBRITE_ROOT']),
+        'db_root': os.path.exists(current_app.config['DB_ROOT']),
+        'logs_dir': os.path.exists(current_app.config.get('LOGS_DIR', '/tmp/ubrite_logs')),
+        'temp_root': os.path.exists('/tmp')
+    }
 
-    workspace_path = os.path.join(ubrite_root, workspace_name)
-    db_path = os.path.join(db_root, f"{workspace_name}.db")
-
-    # Create workspace directory
-    os.makedirs(workspace_path, exist_ok=True)
-
-    # Create workspace subdirectories
-    subdirs = ['data', 'notebooks', 'scripts', 'docs', 'output']
-    for subdir in subdirs:
-        os.makedirs(os.path.join(workspace_path, subdir), exist_ok=True)
-
-    # Create an empty SQLite database file
-    if not os.path.exists(db_path):
-        with open(db_path, 'w') as f:
-            pass
-
-    # Create .gitignore file
-    gitignore_content = """# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Data files
-*.csv
-*.xlsx
-*.json
-*.pickle
-*.pkl
-
-# Output files
-output/
-*.log
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-"""
-
-    gitignore_path = os.path.join(workspace_path, '.gitignore')
-    with open(gitignore_path, 'w') as f:
-        f.write(gitignore_content)
-
-    return workspace_path, db_path
+    return directories
 
 
 def create_workspace_directory(workspace_path):
@@ -127,7 +62,8 @@ def create_workspace_directory(workspace_path):
             os.makedirs(os.path.join(workspace_path, subdir), exist_ok=True)
 
         # Create .gitignore file
-        gitignore_content = """# Python
+        gitignore_content = """
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -153,39 +89,37 @@ venv.bak/
 output/
 *.log
 
-# OS generated files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 """
 
         with open(os.path.join(workspace_path, '.gitignore'), 'w') as f:
-            f.write(gitignore_content)
+            f.write(gitignore_content.strip())
 
-        logging.info(f"Created workspace directory: {workspace_path}")
+        logger.info(f"Created workspace directory: {workspace_path}")
         return True
 
     except Exception as e:
-        logging.error(f"Failed to create workspace directory {workspace_path}: {str(e)}")
+        logger.error(f"Failed to create workspace directory {workspace_path}: {str(e)}")
         return False
 
 
-def delete_workspace_directories(workspace):
-    """Delete the directory structure for a workspace."""
+def delete_workspace_directory(workspace_path):
+    """Safely delete a workspace directory."""
     try:
-        if os.path.exists(workspace.path):
-            shutil.rmtree(workspace.path)
-
-        if os.path.exists(workspace.db_path):
-            os.remove(workspace.db_path)
-
+        if os.path.exists(workspace_path):
+            shutil.rmtree(workspace_path)
+            logger.info(f"Deleted workspace directory: {workspace_path}")
         return True
     except Exception as e:
-        log_event(workspace.id, 'workspace_delete_failed', {'error': str(e)})
+        logger.error(f"Failed to delete workspace directory {workspace_path}: {str(e)}")
         return False
 
 
@@ -195,53 +129,76 @@ def log_event(workspace_id, event_type, details):
         audit_log = AuditLog(
             workspace_id=workspace_id,
             event_type=event_type,
-            details=json.dumps(details),
+            details=json.dumps(details) if details else None,
             timestamp=datetime.utcnow()
         )
         db.session.add(audit_log)
         db.session.commit()
-        logging.info(f"Logged event: {event_type} for workspace {workspace_id}")
+        logger.info(f"Logged event: {event_type} for workspace {workspace_id}")
     except Exception as e:
-        logging.error(f"Failed to log event: {str(e)}")
-
-
-def get_directory_status():
-    """Get the status of all required directories."""
-    directories = {
-        'ubrite_root': os.path.exists(current_app.config['UBRITE_ROOT']),
-        'db_root': os.path.exists(current_app.config['DB_ROOT']),
-        'temp_root': os.path.exists(current_app.config['TEMP_ROOT']),
-        'logs_dir': os.path.exists(current_app.config['LOGS_DIR']),
-        'cache_dir': os.path.exists(current_app.config['CACHE_DIR']),
-        'uploads_dir': os.path.exists(current_app.config['UPLOADS_DIR'])
-    }
-
-    return directories
+        logger.error(f"Failed to log event {event_type}: {str(e)}")
+        db.session.rollback()
 
 
 def get_workspace_size(workspace_path):
     """Get the total size of a workspace directory."""
-    total_size = 0
     try:
+        total_size = 0
         for dirpath, dirnames, filenames in os.walk(workspace_path):
             for filename in filenames:
                 filepath = os.path.join(dirpath, filename)
                 if os.path.exists(filepath):
                     total_size += os.path.getsize(filepath)
+        return total_size
     except Exception as e:
-        logging.error(f"Error calculating workspace size: {str(e)}")
+        logger.error(f"Failed to calculate workspace size for {workspace_path}: {str(e)}")
+        return 0
 
-    return total_size
+
+def cleanup_temp_files():
+    """Clean up temporary files older than 24 hours."""
+    try:
+        temp_dir = '/tmp'
+        current_time = datetime.now().timestamp()
+
+        for filename in os.listdir(temp_dir):
+            if filename.startswith('ubrite_'):
+                filepath = os.path.join(temp_dir, filename)
+                if os.path.isfile(filepath):
+                    file_age = current_time - os.path.getmtime(filepath)
+                    if file_age > 86400:  # 24 hours
+                        os.remove(filepath)
+                        logger.info(f"Cleaned up temp file: {filepath}")
+
+        return True
+    except Exception as e:
+        logger.error(f"Failed to cleanup temp files: {str(e)}")
+        return False
 
 
-def format_file_size(size_bytes):
-    """Format file size in human readable format."""
-    if size_bytes == 0:
-        return "0 B"
+def backup_workspace(workspace_path, backup_path):
+    """Create a backup of a workspace."""
+    try:
+        if os.path.exists(workspace_path):
+            shutil.copytree(workspace_path, backup_path)
+            logger.info(f"Created backup: {workspace_path} -> {backup_path}")
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Failed to backup workspace {workspace_path}: {str(e)}")
+        return False
 
-    size_names = ["B", "KB", "MB", "GB", "TB"]
-    import math
-    i = int(math.floor(math.log(size_bytes, 1024)))
-    p = math.pow(1024, i)
-    s = round(size_bytes / p, 2)
-    return f"{s} {size_names[i]}"
+
+def restore_workspace(backup_path, workspace_path):
+    """Restore a workspace from backup."""
+    try:
+        if os.path.exists(backup_path):
+            if os.path.exists(workspace_path):
+                shutil.rmtree(workspace_path)
+            shutil.copytree(backup_path, workspace_path)
+            logger.info(f"Restored workspace: {backup_path} -> {workspace_path}")
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Failed to restore workspace from {backup_path}: {str(e)}")
+        return False
