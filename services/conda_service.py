@@ -1,188 +1,160 @@
 import subprocess
 import os
-import json
-from flask import current_app
-import tempfile
 import logging
-import shutil
+import yaml
+from flask import current_app
+
 
 class CondaService:
+    """Service for managing Conda environments."""
+
     def __init__(self):
-        self._conda_path = None
-        self._templates_path = None
-    
-    @property
-    def conda_path(self):
-        if self._conda_path is None:
-            # Try to get conda path from config
-            config_path = current_app.config.get('CONDA_PATH', 'conda')
-            
-            # If it's just 'conda', try to find the full path
-            if config_path == 'conda':
-                # Try to find conda in common locations
-                possible_paths = [
-                    # macOS / Linux common paths
-                    '/usr/local/bin/conda',
-                    '/usr/bin/conda',
-                    os.path.expanduser('~/miniconda3/bin/conda'),
-                    os.path.expanduser('~/anaconda3/bin/conda'),
-                    # Windows common paths
-                    r'C:\ProgramData\Miniconda3\Scripts\conda.exe',
-                    r'C:\ProgramData\Anaconda3\Scripts\conda.exe',
-                    os.path.expanduser(r'~\Miniconda3\Scripts\conda.exe'),
-                    os.path.expanduser(r'~\Anaconda3\Scripts\conda.exe'),
-                ]
-                
-                # Also check if conda is in PATH
-                conda_in_path = shutil.which('conda')
-                if conda_in_path:
-                    possible_paths.insert(0, conda_in_path)
-                    logging.info(f"Found conda in PATH: {conda_in_path}")
-                
-                # Try each path
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        config_path = path
-                        logging.info(f"Found conda at: {path}")
-                        break
-                
-                # If we still couldn't find conda, log it but keep the default value
-                if config_path == 'conda':
-                    logging.warning("Could not find conda executable in common locations")
-            
-            self._conda_path = config_path
-        return self._conda_path
-    
-    @property
-    def templates_path(self):
-        if self._templates_path is None:
-            self._templates_path = current_app.config['ENV_TEMPLATES_PATH']
-        return self._templates_path
-    
+        self.logger = logging.getLogger(__name__)
+        self.conda_path = current_app.config.get('CONDA_PATH', 'conda')
+
     def is_conda_available(self):
-        """Check if conda is available."""
+        """Check if Conda is available."""
         try:
-            # Try to run conda --version
-            result = subprocess.run(
-                [self.conda_path, '--version'],
-                capture_output=True,
-                text=True,
-                check=False,  # Don't raise an exception if it fails
-                timeout=10    # Add a timeout to prevent hanging
-            )
+            result = subprocess.run([self.conda_path, '--version'],
+                                    capture_output=True, text=True, timeout=10)
+            return result.returncode == 0
+        except Exception as e:
+            self.logger.error(f"Error checking Conda availability: {str(e)}")
+            return False
+
+    def get_conda_info(self):
+        """Get Conda information."""
+        try:
+            result = subprocess.run([self.conda_path, 'info', '--json'],
+                                    capture_output=True, text=True, timeout=30)
             if result.returncode == 0:
-                logging.info(f"Conda is available: {result.stdout.strip()}")
-                return True
+                import json
+                return json.loads(result.stdout)
+            return None
+        except Exception as e:
+            self.logger.error(f"Error getting Conda info: {str(e)}")
+            return None
+
+    def list_environments(self):
+        """List all Conda environments."""
+        try:
+            result = subprocess.run([self.conda_path, 'env', 'list', '--json'],
+                                    capture_output=True, text=True, timeout=30)
+            if result.returncode == 0:
+                import json
+                return json.loads(result.stdout)
+            return {'envs': []}
+        except Exception as e:
+            self.logger.error(f"Error listing Conda environments: {str(e)}")
+            return {'envs': []}
+
+    def create_environment(self, env_path, template_name=None):
+        """Create a new Conda environment."""
+        try:
+            if template_name:
+                # Use template file
+                template_path = os.path.join(
+                    current_app.config['ENV_TEMPLATES_PATH'],
+                    f"{template_name}.yml"
+                )
+                if os.path.exists(template_path):
+                    cmd = [self.conda_path, 'env', 'create', '-p', env_path, '-f', template_path]
+                else:
+                    self.logger.warning(f"Template {template_name} not found, creating basic environment")
+                    cmd = [self.conda_path, 'create', '-p', env_path, 'python=3.9', '-y']
             else:
-                logging.error(f"Conda check failed with return code {result.returncode}: {result.stderr}")
-                return False
+                # Create basic environment
+                cmd = [self.conda_path, 'create', '-p', env_path, 'python=3.9', '-y']
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+
+            if result.returncode == 0:
+                self.logger.info(f"Conda environment created successfully at {env_path}")
+                return True, "Environment created successfully"
+            else:
+                error_msg = result.stderr or result.stdout
+                self.logger.error(f"Failed to create Conda environment: {error_msg}")
+                return False, f"Failed to create environment: {error_msg}"
+
         except subprocess.TimeoutExpired:
-            logging.error(f"Conda check timed out after 10 seconds")
-            return False
-        except FileNotFoundError:
-            logging.error(f"Conda executable not found at path: {self.conda_path}")
-            return False
+            return False, "Environment creation timed out"
         except Exception as e:
-            logging.error(f"Error checking conda availability: {str(e)}")
-            return False
-    
-    def get_available_templates(self):
-        """Get a list of available environment templates."""
-        templates = []
-        
-        if os.path.exists(self.templates_path):
-            for filename in os.listdir(self.templates_path):
-                if filename.endswith('.yml') or filename.endswith('.yaml'):
-                    template_name = os.path.splitext(filename)[0]
-                    templates.append({
-                        'name': template_name,
-                        'path': os.path.join(self.templates_path, filename)
-                    })
-        
-        return templates
-    
-    def create_environment(self, workspace_path, env_type):
-        """Create a Conda environment for a workspace."""
-        # Check if conda is available
-        if not self.is_conda_available():
-            error_msg = f"Conda not found at '{self.conda_path}'. Please install Conda or configure the correct path."
-            logging.error(error_msg)
-            return False, error_msg
-        
-        env_name = os.path.basename(workspace_path)
-        
-        if env_type == 'custom':
-            # Create a basic environment
-            cmd = [
-                self.conda_path, 'create', '-y', '-p',
-                os.path.join(workspace_path, 'env'),
-                'python=3.9'
-            ]
-        else:
-            # Use a template
-            template_path = None
-            for template in self.get_available_templates():
-                if template['name'] == env_type:
-                    template_path = template['path']
-                    break
-            
-            if not template_path:
-                return False, "Template not found"
-            
-            cmd = [
-                self.conda_path, 'env', 'create', '-f', template_path,
-                '-p', os.path.join(workspace_path, 'env')
-            ]
-        
-        try:
-            logging.info(f"Creating conda environment with command: {' '.join(cmd)}")
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            return True, result.stdout
-        except subprocess.CalledProcessError as e:
-            logging.error(f"Error creating conda environment: {e.stderr}")
-            return False, e.stderr
-        except FileNotFoundError as e:
-            error_msg = f"Conda executable not found at '{self.conda_path}'. Please install Conda or configure the correct path."
-            logging.error(error_msg)
-            return False, error_msg
-        except Exception as e:
-            logging.error(f"Unexpected error creating conda environment: {str(e)}")
-            return False, str(e)
-    
-    def delete_environment(self, workspace_path):
+            self.logger.error(f"Error creating Conda environment: {str(e)}")
+            return False, f"Error creating environment: {str(e)}"
+
+    def delete_environment(self, env_path):
         """Delete a Conda environment."""
-        env_path = os.path.join(workspace_path, 'env')
-        
-        if not os.path.exists(env_path):
-            return True, "Environment does not exist"
-        
-        # Check if conda is available
-        if not self.is_conda_available():
-            # If conda is not available, just remove the directory
-            try:
-                shutil.rmtree(env_path)
-                return True, "Environment directory removed (conda not available)"
-            except Exception as e:
-                return False, f"Failed to remove environment directory: {str(e)}"
-        
-        cmd = [self.conda_path, 'env', 'remove', '-y', '-p', env_path]
-        
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            return True, result.stdout
-        except subprocess.CalledProcessError as e:
-            logging.error(f"Error removing conda environment: {e.stderr}")
-            return False, e.stderr
+            if os.path.exists(env_path):
+                result = subprocess.run([self.conda_path, 'env', 'remove', '-p', env_path, '-y'],
+                                        capture_output=True, text=True, timeout=60)
+                if result.returncode == 0:
+                    self.logger.info(f"Conda environment deleted: {env_path}")
+                    return True
+                else:
+                    self.logger.error(f"Failed to delete Conda environment: {result.stderr}")
+            return True  # Consider it successful if path doesn't exist
         except Exception as e:
-            logging.error(f"Unexpected error removing conda environment: {str(e)}")
-            return False, str(e)
+            self.logger.error(f"Error deleting Conda environment: {str(e)}")
+            return False
+
+    def get_available_templates(self):
+        """Get available environment templates."""
+        templates = []
+        templates_dir = current_app.config.get('ENV_TEMPLATES_PATH')
+
+        if templates_dir and os.path.exists(templates_dir):
+            for file in os.listdir(templates_dir):
+                if file.endswith('.yml') or file.endswith('.yaml'):
+                    template_name = file.replace('.yml', '').replace('.yaml', '')
+                    templates.append(template_name)
+
+        return sorted(templates)
+
+    def get_python_environments(self):
+        """Get all Python environments (Conda + system)."""
+        environments = []
+
+        # Get Conda environments
+        try:
+            conda_envs = self.list_environments()
+            for env_path in conda_envs.get('envs', []):
+                try:
+                    # Get Python version
+                    python_path = os.path.join(env_path, 'bin', 'python')
+                    if os.path.exists(python_path):
+                        result = subprocess.run([python_path, '--version'],
+                                                capture_output=True, text=True, timeout=10)
+                        version = result.stdout.strip() if result.returncode == 0 else 'Unknown'
+
+                        environments.append({
+                            'name': os.path.basename(env_path),
+                            'type': 'conda',
+                            'path': env_path,
+                            'version': version
+                        })
+                except Exception as e:
+                    self.logger.warning(f"Error getting info for environment {env_path}: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"Error getting Conda environments: {str(e)}")
+
+        # Get system Python
+        try:
+            result = subprocess.run(['python3', '--version'],
+                                    capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                version = result.stdout.strip()
+                python_path = subprocess.run(['which', 'python3'],
+                                             capture_output=True, text=True, timeout=10)
+                path = python_path.stdout.strip() if python_path.returncode == 0 else 'python3'
+
+                environments.append({
+                    'name': 'system',
+                    'type': 'system',
+                    'path': path,
+                    'version': version
+                })
+        except Exception as e:
+            self.logger.warning(f"Error getting system Python info: {str(e)}")
+
+        return environments

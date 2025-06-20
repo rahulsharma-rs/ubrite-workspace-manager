@@ -9,7 +9,7 @@ from extensions import db
 import subprocess
 
 
-def ensure_directories():
+def ensure_directories(log_initialization=True):
     """Ensure all required directories exist."""
     directories = [
         current_app.config['UBRITE_ROOT'],
@@ -24,9 +24,30 @@ def ensure_directories():
         try:
             os.makedirs(directory, exist_ok=True)
             logging.info(f"Ensured directory exists: {directory}")
+
+            # Create .gitkeep file
+            gitkeep_file = os.path.join(directory, '.gitkeep')
+            if not os.path.exists(gitkeep_file):
+                with open(gitkeep_file, 'w') as f:
+                    f.write('')
+
         except Exception as e:
             logging.error(f"Failed to create directory {directory}: {str(e)}")
             raise
+
+    # Log initialization if requested
+    if log_initialization:
+        init_file = os.path.join(current_app.config['UBRITE_ROOT'], '.initialized')
+        if not os.path.exists(init_file):
+            try:
+                with open(init_file, 'w') as f:
+                    f.write(str(datetime.utcnow().isoformat()))
+                log_event(None, 'system_initialized', {
+                    'directories_created': len(directories),
+                    'timestamp': datetime.utcnow().isoformat()
+                })
+            except Exception as e:
+                logging.warning(f"Could not log initialization: {str(e)}")
 
 
 def create_workspace_directories(workspace_name):
@@ -41,14 +62,55 @@ def create_workspace_directories(workspace_name):
     os.makedirs(workspace_path, exist_ok=True)
 
     # Create workspace subdirectories
-    os.makedirs(os.path.join(workspace_path, 'data'), exist_ok=True)
-    os.makedirs(os.path.join(workspace_path, 'notebooks'), exist_ok=True)
-    os.makedirs(os.path.join(workspace_path, 'scripts'), exist_ok=True)
+    subdirs = ['data', 'notebooks', 'scripts', 'docs', 'output']
+    for subdir in subdirs:
+        os.makedirs(os.path.join(workspace_path, subdir), exist_ok=True)
 
     # Create an empty SQLite database file
     if not os.path.exists(db_path):
         with open(db_path, 'w') as f:
             pass
+
+    # Create .gitignore file
+    gitignore_content = """# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Data files
+*.csv
+*.xlsx
+*.json
+*.pickle
+*.pkl
+
+# Output files
+output/
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+"""
+
+    gitignore_path = os.path.join(workspace_path, '.gitignore')
+    with open(gitignore_path, 'w') as f:
+        f.write(gitignore_content)
 
     return workspace_path, db_path
 

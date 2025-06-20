@@ -6,11 +6,12 @@ from utils.encryption import decrypt_data
 from extensions import db
 import logging
 
+
 class GitLabService:
     def __init__(self):
         self._api_url = None
         self._headers = None
-    
+
     @property
     def api_url(self):
         if self._api_url is None:
@@ -28,20 +29,20 @@ class GitLabService:
             else:
                 self._api_url = current_app.config['GITLAB_API_URL']
         return self._api_url
-    
+
     @property
     def headers(self):
         if self._headers is None:
             self._headers = self._get_headers()
         return self._headers
-    
+
     def _get_headers(self):
         """Get the headers for GitLab API requests."""
         settings = Settings.query.first()
         if not settings or not settings.gitlab_pat_encrypted:
             logging.warning("GitLab PAT not configured")
             return {}
-        
+
         try:
             token = decrypt_data(settings.gitlab_pat_encrypted, settings.encryption_key)
             return {
@@ -51,7 +52,7 @@ class GitLabService:
         except Exception as e:
             logging.error(f"Error decrypting GitLab PAT: {str(e)}")
             return {}
-    
+
     def validate_token(self, token, api_url=None):
         """Validate a GitLab Personal Access Token."""
         headers = {
@@ -59,13 +60,20 @@ class GitLabService:
             'Content-Type': 'application/json'
         }
         url = api_url or self.api_url
+
+        # Ensure URL ends with /api/v4
+        if not url.endswith('/api/v4'):
+            url = url.rstrip('/') + '/api/v4'
+
         try:
-            response = requests.get(f"{url}/user", headers=headers)
+            logging.info(f"Validating GitLab token at: {url}/user")
+            response = requests.get(f"{url}/user", headers=headers, timeout=10)
+            logging.info(f"Token validation response: {response.status_code}")
             return response.status_code == 200
         except Exception as e:
             logging.error(f"Error validating GitLab token: {str(e)}")
             return False
-    
+
     def create_repository(self, name, visibility='private'):
         """Create a new GitLab repository."""
         data = {
@@ -73,20 +81,21 @@ class GitLabService:
             'visibility': visibility,
             'initialize_with_readme': True
         }
-        
+
         # Check if headers contain a token
         if 'PRIVATE-TOKEN' not in self.headers:
             logging.error("Cannot create GitLab repository: No PAT configured")
             return None
-        
+
         try:
             logging.info(f"Creating GitLab repository: {name} at {self.api_url}")
             response = requests.post(
                 f"{self.api_url}/projects",
                 headers=self.headers,
-                data=json.dumps(data)
+                data=json.dumps(data),
+                timeout=30
             )
-            
+
             if response.status_code in (201, 200):
                 logging.info(f"GitLab repository created successfully: {name}")
                 return response.json()
@@ -96,17 +105,18 @@ class GitLabService:
         except Exception as e:
             logging.error(f"Exception creating GitLab repository: {str(e)}")
             return None
-    
+
     def delete_repository(self, repo_id):
         """Delete a GitLab repository."""
         if not repo_id:
             logging.warning("Cannot delete GitLab repository: No repo ID provided")
             return True  # Return True to allow cleanup to continue
-        
+
         try:
             response = requests.delete(
                 f"{self.api_url}/projects/{repo_id}",
-                headers=self.headers
+                headers=self.headers,
+                timeout=30
             )
             success = response.status_code in (200, 202, 204)
             if success:
@@ -117,15 +127,16 @@ class GitLabService:
         except Exception as e:
             logging.error(f"Exception deleting GitLab repository: {str(e)}")
             return False
-    
+
     def get_repository_info(self, repo_id):
         """Get information about a GitLab repository."""
         try:
             response = requests.get(
                 f"{self.api_url}/projects/{repo_id}",
-                headers=self.headers
+                headers=self.headers,
+                timeout=30
             )
-            
+
             if response.status_code == 200:
                 return response.json()
             else:
@@ -134,15 +145,16 @@ class GitLabService:
         except Exception as e:
             logging.error(f"Exception getting GitLab repository info: {str(e)}")
             return None
-    
+
     def get_commits(self, repo_id, branch='main'):
         """Get commits for a repository."""
         try:
             response = requests.get(
                 f"{self.api_url}/projects/{repo_id}/repository/commits?ref_name={branch}",
-                headers=self.headers
+                headers=self.headers,
+                timeout=30
             )
-            
+
             if response.status_code == 200:
                 return response.json()
             else:
@@ -151,7 +163,7 @@ class GitLabService:
         except Exception as e:
             logging.error(f"Exception getting GitLab commits: {str(e)}")
             return []
-    
+
     def test_connection(self):
         """Test the GitLab connection and return status information."""
         if 'PRIVATE-TOKEN' not in self.headers:
@@ -160,17 +172,22 @@ class GitLabService:
                 'message': 'GitLab PAT not configured',
                 'details': 'Please configure a GitLab Personal Access Token in the settings.'
             }
-        
+
         try:
+            # Ensure URL ends with /api/v4
+            api_url = self.api_url
+            if not api_url.endswith('/api/v4'):
+                api_url = api_url.rstrip('/') + '/api/v4'
+
             # Log the URL we're trying to connect to for debugging
-            logging.info(f"Testing GitLab connection to: {self.api_url}")
-            
-            response = requests.get(f"{self.api_url}/user", headers=self.headers, timeout=10)
-            
+            logging.info(f"Testing GitLab connection to: {api_url}")
+
+            response = requests.get(f"{api_url}/user", headers=self.headers, timeout=30)
+
             # Log the response status and content for debugging
             logging.info(f"GitLab API response status: {response.status_code}")
             logging.info(f"GitLab API response content length: {len(response.content)}")
-            
+
             if response.status_code == 200:
                 try:
                     user_data = response.json()
@@ -186,6 +203,24 @@ class GitLabService:
                         'message': 'Invalid response from GitLab API',
                         'details': f"Received status code 200 but response is not valid JSON. This may indicate a network issue or proxy interference."
                     }
+            elif response.status_code == 401:
+                return {
+                    'success': False,
+                    'message': 'Authentication failed',
+                    'details': 'Invalid Personal Access Token. Please check your token and try again.'
+                }
+            elif response.status_code == 403:
+                return {
+                    'success': False,
+                    'message': 'Access forbidden',
+                    'details': 'Your Personal Access Token does not have sufficient permissions. Make sure it has "api" scope.'
+                }
+            elif response.status_code == 404:
+                return {
+                    'success': False,
+                    'message': 'GitLab API not found',
+                    'details': f'The GitLab API endpoint was not found. Please verify the URL: {api_url}'
+                }
             else:
                 # Try to get error details from response
                 error_details = "No additional details available"
@@ -199,12 +234,13 @@ class GitLabService:
                 except:
                     if response.content:
                         error_details = f"Raw response: {response.content[:100]}"
-            
-            return {
-                'success': False,
-                'message': f'GitLab API error: {response.status_code}',
-                'details': error_details
-            }
+
+                return {
+                    'success': False,
+                    'message': f'GitLab API error: {response.status_code}',
+                    'details': error_details
+                }
+
         except requests.exceptions.ConnectionError as e:
             logging.error(f"Connection error: {str(e)}")
             return {
@@ -218,6 +254,13 @@ class GitLabService:
                 'success': False,
                 'message': 'Connection timeout',
                 'details': f"Connection to GitLab API timed out. The server might be slow or unreachable."
+            }
+        except requests.exceptions.SSLError as e:
+            logging.error(f"SSL error: {str(e)}")
+            return {
+                'success': False,
+                'message': 'SSL certificate error',
+                'details': f"SSL certificate verification failed. This might be due to a self-signed certificate or network proxy."
             }
         except json.JSONDecodeError as e:
             logging.error(f"JSON decode error: {str(e)}")

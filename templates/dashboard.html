@@ -113,10 +113,11 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="gitlab-url" class="form-label">GitLab URL (Optional)</label>
-                        <input type="text" class="form-control" id="gitlab-url" name="gitlab_url" placeholder="https://gitlab.com">
+                        <label for="gitlab-url" class="form-label">GitLab URL</label>
+                        <input type="text" class="form-control" id="gitlab-url" name="gitlab_url"
+                               placeholder="https://gitlab.rc.uab.edu" value="https://gitlab.rc.uab.edu">
                         <div class="form-text">
-                            Leave empty to use the default GitLab.com
+                            Your GitLab instance URL (without /api/v4)
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary">Save Configuration</button>
@@ -273,8 +274,11 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Get the base URL for API calls
+        const baseUrl = window.location.origin;
+
         // Check if GitLab PAT is set
-        fetch('/settings')
+        fetch(`${baseUrl}/settings`)
             .then(response => response.json())
             .then(data => {
                 const statusDiv = document.getElementById('settings-status');
@@ -288,12 +292,18 @@
 
                 // Populate GitLab URL if available
                 if (data.gitlab_url) {
-                    document.getElementById('gitlab-url').value = data.gitlab_url;
+                    // Remove /api/v4 suffix for display
+                    const displayUrl = data.gitlab_url.replace('/api/v4', '');
+                    document.getElementById('gitlab-url').value = displayUrl;
                 }
+            })
+            .catch(error => {
+                console.error('Error loading settings:', error);
+                document.getElementById('settings-status').innerHTML = '<div class="alert alert-danger">Failed to load settings</div>';
             });
 
         // Check Conda availability
-        fetch('/workspaces/check-conda')
+        fetch(`${baseUrl}/workspaces/check-conda`)
             .then(response => response.json())
             .then(data => {
                 const statusDiv = document.getElementById('conda-status');
@@ -326,7 +336,7 @@
             });
 
         // Check JupyterLab availability
-        fetch('/ide/check-jupyter')
+        fetch(`${baseUrl}/ide/check-jupyter`)
             .then(response => response.json())
             .then(data => {
                 const statusDiv = document.getElementById('jupyter-status');
@@ -363,7 +373,7 @@
 
 
         // Load Python environments
-        fetch('/workspaces/python-environments')
+        fetch(`${baseUrl}/workspaces/python-environments`)
             .then(response => response.json())
             .then(data => {
                 const container = document.getElementById('python-envs-container');
@@ -534,7 +544,7 @@
             });
 
         // Load environment templates
-        fetch('/env-templates')
+        fetch(`${baseUrl}/env-templates`)
             .then(response => response.json())
             .then(data => {
                 const container = document.getElementById('template-cards');
@@ -600,7 +610,7 @@
             });
 
         // Check application status
-        fetch('/app-status')
+        fetch(`${baseUrl}/app-status`)
             .then(response => response.json())
             .then(data => {
                 const statusDiv = document.getElementById('app-status');
@@ -681,7 +691,14 @@
 
             const formData = new FormData(settingsForm);
 
-            fetch('/settings', {
+            // Process GitLab URL to ensure it has the correct format
+            let gitlabUrl = formData.get('gitlab_url');
+            if (gitlabUrl && !gitlabUrl.endsWith('/api/v4')) {
+                gitlabUrl = gitlabUrl.replace(/\/$/, '') + '/api/v4';
+                formData.set('gitlab_url', gitlabUrl);
+            }
+
+            fetch(`${baseUrl}/settings`, {
                 method: 'POST',
                 body: formData
             })
@@ -722,7 +739,7 @@
                 </div>
             `;
 
-            fetch('/settings', {
+            fetch(`${baseUrl}/settings`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -735,7 +752,7 @@
                     statusDiv.innerHTML = '<div class="alert alert-success">Conda path saved successfully</div>';
 
                     // Check if conda is available with the new path
-                    fetch('/workspaces/check-conda')
+                    fetch(`${baseUrl}/workspaces/check-conda`)
                         .then(response => response.json())
                         .then(data => {
                             if (data.available) {
@@ -783,7 +800,7 @@
                 </div>
             `;
 
-            fetch('/settings', {
+            fetch(`${baseUrl}/settings`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -796,7 +813,7 @@
                     statusDiv.innerHTML = '<div class="alert alert-success">JupyterLab path saved successfully</div>';
 
                     // Check if JupyterLab is available with the new path
-                    fetch('/ide/check-jupyter')
+                    fetch(`${baseUrl}/ide/check-jupyter`)
                         .then(response => response.json())
                         .then(data => {
                             if (data.success) {
@@ -847,8 +864,13 @@
                 </div>
             `;
 
-            fetch('/test-gitlab')
-                .then(response => response.json())
+            fetch(`${baseUrl}/test-gitlab`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (data.success) {
                         statusDiv.innerHTML = `
@@ -868,7 +890,12 @@
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    statusDiv.innerHTML = '<div class="alert alert-danger">Failed to test GitLab connection</div>';
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-danger">
+                            <strong>Connection Failed</strong><br>
+                            ${error.message}
+                        </div>
+                    `;
                 });
         }
 
@@ -886,7 +913,7 @@
                 </div>
             `;
 
-            fetch('/debug-gitlab')
+            fetch(`${baseUrl}/debug-gitlab`)
                 .then(response => response.json())
                 .then(data => {
                     let debugInfo = `
@@ -933,7 +960,7 @@
         });
 
         // Load git configuration
-        fetch('/git-config')
+        fetch(`${baseUrl}/git-config`)
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.config) {
@@ -974,7 +1001,7 @@
                 </div>
             `;
 
-            fetch('/git-config', {
+            fetch(`${baseUrl}/git-config`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1018,7 +1045,7 @@
             `;
 
             // Simple test - just verify the configuration is saved
-            fetch('/git-config')
+            fetch(`${baseUrl}/git-config`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success && data.config) {
