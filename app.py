@@ -87,22 +87,85 @@ def create_app(config_name=None):
                       cors_allowed_origins=app.config['CORS_ORIGINS'],
                       async_mode='threading')
 
-    # Import and register blueprints
+    # Add basic routes first (before blueprints)
+    @app.route('/health')
+    def health_check():
+        return jsonify({'status': 'healthy', 'timestamp': str(datetime.utcnow())})
+
+    @app.route('/status')
+    def basic_status():
+        try:
+            return jsonify({
+                'app': 'UBRITE Workspace Manager',
+                'status': 'running',
+                'timestamp': str(datetime.utcnow()),
+                'version': '1.0.0'
+            })
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/debug/info')
+    def debug_info():
+        try:
+            return jsonify({
+                'config_loaded': True,
+                'database_initialized': True,
+                'blueprints_registered': len(app.blueprints),
+                'routes_count': len(list(app.url_map.iter_rules())),
+                'ubrite_root': app.config.get('UBRITE_ROOT', 'Not set')
+            })
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    # Add a simple root route as fallback
+    @app.route('/test')
+    def test_route():
+        return "<h1>UBRITE Test Route</h1><p>If you see this, Flask is working!</p>"
+
+    # Import and register blueprints with error handling
+    blueprints_registered = []
+
     try:
         from blueprints.dashboard import dashboard_bp
-        from blueprints.workspaces import workspaces_bp
-        from blueprints.git import git_bp
-        from blueprints.ide import ide_bp
-        from blueprints.files import files_bp
-
         app.register_blueprint(dashboard_bp)
-        app.register_blueprint(workspaces_bp, url_prefix='/workspaces')
-        app.register_blueprint(git_bp, url_prefix='/git')
-        app.register_blueprint(ide_bp, url_prefix='/ide')
-        app.register_blueprint(files_bp, url_prefix='/files')
+        blueprints_registered.append('dashboard')
+        print("✅ Dashboard blueprint registered")
     except Exception as e:
-        print(f"Error registering blueprints: {str(e)}")
-        # Continue without blueprints for debugging
+        print(f"❌ Error registering dashboard blueprint: {str(e)}")
+
+    try:
+        from blueprints.workspaces import workspaces_bp
+        app.register_blueprint(workspaces_bp, url_prefix='/workspaces')
+        blueprints_registered.append('workspaces')
+        print("✅ Workspaces blueprint registered")
+    except Exception as e:
+        print(f"❌ Error registering workspaces blueprint: {str(e)}")
+
+    try:
+        from blueprints.git import git_bp
+        app.register_blueprint(git_bp, url_prefix='/git')
+        blueprints_registered.append('git')
+        print("✅ Git blueprint registered")
+    except Exception as e:
+        print(f"❌ Error registering git blueprint: {str(e)}")
+
+    try:
+        from blueprints.ide import ide_bp
+        app.register_blueprint(ide_bp, url_prefix='/ide')
+        blueprints_registered.append('ide')
+        print("✅ IDE blueprint registered")
+    except Exception as e:
+        print(f"❌ Error registering ide blueprint: {str(e)}")
+
+    try:
+        from blueprints.files import files_bp
+        app.register_blueprint(files_bp, url_prefix='/files')
+        blueprints_registered.append('files')
+        print("✅ Files blueprint registered")
+    except Exception as e:
+        print(f"❌ Error registering files blueprint: {str(e)}")
+
+    print(f"📋 Registered blueprints: {blueprints_registered}")
 
     # Add debug route to list all routes
     @app.route('/debug/routes')
@@ -114,20 +177,10 @@ def create_app(config_name=None):
                 'methods': list(rule.methods),
                 'rule': str(rule)
             })
-        return jsonify({'routes': routes})
-
-    # Add simple health check
-    @app.route('/health')
-    def health_check():
-        return jsonify({'status': 'healthy', 'timestamp': str(datetime.utcnow())})
-
-    # Add basic status endpoint
-    @app.route('/status')
-    def basic_status():
         return jsonify({
-            'app': 'UBRITE Workspace Manager',
-            'status': 'running',
-            'timestamp': str(datetime.utcnow())
+            'routes': routes,
+            'total_routes': len(routes),
+            'blueprints_registered': blueprints_registered
         })
 
     # Error handlers with CORS support
@@ -135,20 +188,20 @@ def create_app(config_name=None):
     def not_found(error):
         if request.is_json or 'application/json' in request.headers.get('Accept', ''):
             return jsonify({'error': 'Not found'}), 404
-        return render_template('404.html'), 404
+        return "<h1>404 - Not Found</h1><p>The requested URL was not found.</p>", 404
 
     @app.errorhandler(500)
     def internal_error(error):
         if request.is_json or 'application/json' in request.headers.get('Accept', ''):
             return jsonify({'error': 'Internal server error'}), 500
-        return render_template('500.html'), 500
+        return "<h1>500 - Internal Server Error</h1><p>Something went wrong.</p>", 500
 
     # CSRF error handler
     @app.errorhandler(400)
     def csrf_error(error):
         if request.is_json or 'application/json' in request.headers.get('Accept', ''):
             return jsonify({'error': 'CSRF token missing or invalid'}), 400
-        return render_template('400.html'), 400
+        return "<h1>400 - Bad Request</h1><p>CSRF token missing or invalid.</p>", 400
 
     # Template context processor to make config available in templates
     @app.context_processor
@@ -175,13 +228,12 @@ def create_app(config_name=None):
                     settings.gitlab_url = 'https://gitlab.rc.uab.edu/api/v4'
                     db.session.add(settings)
                     db.session.commit()
-                    app.logger.info(f"Created default settings with GitLab URL: {settings.gitlab_url}")
+                    print(f"✅ Created default settings with GitLab URL: {settings.gitlab_url}")
             except Exception as e:
-                app.logger.warning(f"Could not initialize default settings: {str(e)}")
+                print(f"⚠️ Could not initialize default settings: {str(e)}")
 
         except Exception as e:
-            print(f"Error during app initialization: {str(e)}")
-            # Don't fail completely, just log the error
+            print(f"❌ Error during app initialization: {str(e)}")
 
     return app
 
