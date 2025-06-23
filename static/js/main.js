@@ -25,11 +25,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Get the correct base URL for API calls
+  function getApiBaseUrl() {
+    // For OnDemand, the base URL should be the current path
+    const currentPath = window.location.pathname
+    if (currentPath.includes("/pun/dev/")) {
+      // Extract the base path for OnDemand
+      const pathParts = currentPath.split("/")
+      const punIndex = pathParts.indexOf("pun")
+      if (punIndex !== -1) {
+        return pathParts.slice(0, punIndex + 3).join("/") // /pun/dev/appname
+      }
+    }
+    return window.location.origin
+  }
+
   // Global GitLab token expiration checker
   function checkGitLabTokenExpiration() {
-    // Use the correct base URL for the API call
-    const baseUrl = window.location.origin + window.location.pathname.split("/").slice(0, -1).join("/")
-    const apiUrl = baseUrl.endsWith("/") ? baseUrl + "gitlab-status" : baseUrl + "/gitlab-status"
+    const baseUrl = getApiBaseUrl()
+    const apiUrl = `${baseUrl}/gitlab-status`
 
     console.log("Checking GitLab status at:", apiUrl)
 
@@ -119,6 +133,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Make global functions available
   window.showGlobalAlert = showGlobalAlert
   window.checkGitLabTokenExpiration = checkGitLabTokenExpiration
+  window.getApiBaseUrl = getApiBaseUrl
 
   // Analytics tracking
   function trackEvent(eventName, payload) {

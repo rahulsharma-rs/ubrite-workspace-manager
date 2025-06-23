@@ -1,106 +1,258 @@
-// Add new GitLab-specific API methods
-window.API = window.API || {}
+// API Client for UBRITE Workspace Manager
+class UBRITEAPIClient {
+  constructor() {
+    this.baseURL = this.getBaseURL()
+    this.timeout = 30000 // 30 seconds
+  }
 
-// GitLab API methods
-window.API.gitlab = {
-  validateToken: (token, gitlabUrl) =>
-    fetch("/validate-gitlab-token", {
-      method: "POST",
+  getBaseURL() {
+    // For OnDemand deployment, use the current path structure
+    const currentPath = window.location.pathname
+    if (currentPath.includes("/pun/dev/")) {
+      // Extract the base path for OnDemand
+      const pathParts = currentPath.split("/")
+      const punIndex = pathParts.indexOf("pun")
+      if (punIndex !== -1) {
+        return pathParts.slice(0, punIndex + 3).join("/") // /pun/dev/appname
+      }
+    }
+    return window.location.origin
+  }
+
+  async request(endpoint, options = {}) {
+    const url = `${this.baseURL}${endpoint.startsWith("/") ? endpoint : "/" + endpoint}`
+
+    const defaultOptions = {
       headers: {
         "Content-Type": "application/json",
+        Accept: "application/json",
       },
-      body: JSON.stringify({
-        token: token,
-        gitlab_url: gitlabUrl,
-      }),
-    }).then((response) => response.json()),
+      timeout: this.timeout,
+    }
 
-  getStatus: () => fetch("/gitlab-status").then((response) => response.json()),
+    const config = { ...defaultOptions, ...options }
 
-  testConnection: () => fetch("/test-gitlab").then((response) => response.json()),
+    // Add CSRF token if available
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content")
+    if (csrfToken) {
+      config.headers["X-CSRFToken"] = csrfToken
+    }
 
-  debug: () => fetch("/debug-gitlab").then((response) => response.json()),
-}
+    console.log(`API Request: ${config.method || "GET"} ${url}`)
 
-// Settings API methods (updated)
-window.API.settings = {
-  get: () => fetch("/settings").then((response) => response.json()),
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout)
 
-  save: (settings) =>
-    fetch("/settings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(settings),
-    }).then((response) => response.json()),
+      const response = await fetch(url, {
+        ...config,
+        signal: controller.signal,
+      })
 
-  // Legacy method for backward compatibility
-  update: function (settings) {
-    return this.save(settings)
-  },
-}
+      clearTimeout(timeoutId)
 
-// System API methods
-window.API.system = {
-  health: () => fetch("/health").then((response) => response.json()),
+      console.log(`API Response: ${response.status} ${response.statusText}`)
 
-  status: () => fetch("/app-status").then((response) => response.json()),
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
 
-  info: () => fetch("/api/info").then((response) => response.json()),
-}
+      const contentType = response.headers.get("content-type")
+      if (contentType && contentType.includes("application/json")) {
+        return await response.json()
+      } else {
+        return await response.text()
+      }
+    } catch (error) {
+      if (error.name === "AbortError") {
+        throw new Error("Request timeout")
+      }
+      console.error(`API Error for ${url}:`, error)
+      throw error
+    }
+  }
 
-// Git configuration API methods
-window.API.git = {
-  config: {
-    get: () => fetch("/git-config").then((response) => response.json()),
+  // Workspace API
+  workspaces = {
+    list: () => this.request("/workspaces"),
 
-    update: (config) =>
-      fetch("/git-config", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(config),
-      }).then((response) => response.json()),
-  },
-}
-
-// Environment templates API
-window.API.templates = {
-  list: () => fetch("/env-templates").then((response) => response.json()),
-}
-
-// Backward compatibility - ensure existing API calls still work
-if (!window.API.workspaces) {
-  window.API.workspaces = {
-    list: () => fetch("/workspaces/api/list").then((response) => response.json()),
-
-    get: (id) => fetch(`/workspaces/api/${id}`).then((response) => response.json()),
+    get: (id) => this.request(`/workspaces/${id}`),
 
     create: (data) =>
-      fetch("/workspaces/create", {
+      this.request("/workspaces", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(data),
-      }).then((response) => response.json()),
+      }),
+
+    update: (id, data) =>
+      this.request(`/workspaces/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
 
     delete: (id) =>
-      fetch(`/workspaces/${id}/delete`, {
+      this.request(`/workspaces/${id}`, {
+        method: "DELETE",
+      }),
+
+    clone: (id, data) =>
+      this.request(`/workspaces/${id}/clone`, {
         method: "POST",
-      }).then((response) => response.json()),
+        body: JSON.stringify(data),
+      }),
+  }
+
+  // Settings API
+  settings = {
+    get: () => this.request("/settings"),
+
+    save: (data) =>
+      this.request("/settings", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    validateGitLabToken: (data) =>
+      this.request("/validate-gitlab-token", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    testGitLab: () => this.request("/test-gitlab"),
+
+    getGitLabStatus: () => this.request("/gitlab-status"),
+
+    debugGitLab: () => this.request("/debug-gitlab"),
+  }
+
+  // Git API
+  git = {
+    getConfig: () => this.request("/git-config"),
+
+    saveConfig: (data) =>
+      this.request("/git-config", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    testConfig: () => this.request("/test-git-config"),
+
+    clone: (workspaceId, data) =>
+      this.request(`/workspaces/${workspaceId}/git/clone`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    status: (workspaceId) => this.request(`/workspaces/${workspaceId}/git/status`),
+
+    commit: (workspaceId, data) =>
+      this.request(`/workspaces/${workspaceId}/git/commit`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    push: (workspaceId) =>
+      this.request(`/workspaces/${workspaceId}/git/push`, {
+        method: "POST",
+      }),
+
+    pull: (workspaceId) =>
+      this.request(`/workspaces/${workspaceId}/git/pull`, {
+        method: "POST",
+      }),
+  }
+
+  // IDE API
+  ide = {
+    launch: (workspaceId, ideType = "jupyter") =>
+      this.request(`/workspaces/${workspaceId}/ide/launch`, {
+        method: "POST",
+        body: JSON.stringify({ ide_type: ideType }),
+      }),
+
+    status: (workspaceId) => this.request(`/workspaces/${workspaceId}/ide/status`),
+
+    stop: (workspaceId) =>
+      this.request(`/workspaces/${workspaceId}/ide/stop`, {
+        method: "POST",
+      }),
+  }
+
+  // Files API
+  files = {
+    list: (workspaceId, path = "") => this.request(`/workspaces/${workspaceId}/files?path=${encodeURIComponent(path)}`),
+
+    get: (workspaceId, path) => this.request(`/workspaces/${workspaceId}/files/${encodeURIComponent(path)}`),
+
+    create: (workspaceId, path, content = "") =>
+      this.request(`/workspaces/${workspaceId}/files`, {
+        method: "POST",
+        body: JSON.stringify({ path, content }),
+      }),
+
+    update: (workspaceId, path, content) =>
+      this.request(`/workspaces/${workspaceId}/files/${encodeURIComponent(path)}`, {
+        method: "PUT",
+        body: JSON.stringify({ content }),
+      }),
+
+    delete: (workspaceId, path) =>
+      this.request(`/workspaces/${workspaceId}/files/${encodeURIComponent(path)}`, {
+        method: "DELETE",
+      }),
+
+    upload: (workspaceId, formData) =>
+      this.request(`/workspaces/${workspaceId}/files/upload`, {
+        method: "POST",
+        body: formData,
+        headers: {}, // Let browser set Content-Type for FormData
+      }),
+  }
+
+  // Environment API
+  environments = {
+    getTemplates: () => this.request("/env-templates"),
+
+    create: (workspaceId, template) =>
+      this.request(`/workspaces/${workspaceId}/environment`, {
+        method: "POST",
+        body: JSON.stringify({ template }),
+      }),
+
+    status: (workspaceId) => this.request(`/workspaces/${workspaceId}/environment/status`),
+
+    activate: (workspaceId) =>
+      this.request(`/workspaces/${workspaceId}/environment/activate`, {
+        method: "POST",
+      }),
+
+    deactivate: (workspaceId) =>
+      this.request(`/workspaces/${workspaceId}/environment/deactivate`, {
+        method: "POST",
+      }),
+
+    install: (workspaceId, packages) =>
+      this.request(`/workspaces/${workspaceId}/environment/install`, {
+        method: "POST",
+        body: JSON.stringify({ packages }),
+      }),
+  }
+
+  // System API
+  system = {
+    status: () => this.request("/app-status"),
+
+    health: () => this.request("/health"),
+
+    logs: (lines = 100) => this.request(`/logs?lines=${lines}`),
   }
 }
 
-if (!window.API.ide) {
-  window.API.ide = {
-    launch: (workspaceId, type = "jupyter") =>
-      fetch(`/ide/launch/${workspaceId}?type=${type}`, {
-        method: "POST",
-      }).then((response) => response.json()),
+// Create global API instance
+window.API = new UBRITEAPIClient()
 
-    status: (workspaceId) => fetch(`/ide/status/${workspaceId}`).then((response) => response.json()),
-  }
+// Export for module usage
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = UBRITEAPIClient
 }
