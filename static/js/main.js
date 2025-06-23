@@ -27,9 +27,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Global GitLab token expiration checker
   function checkGitLabTokenExpiration() {
-    fetch("/gitlab-status")
-      .then((response) => response.json())
+    // Use the correct base URL for the API call
+    const baseUrl = window.location.origin + window.location.pathname.split("/").slice(0, -1).join("/")
+    const apiUrl = baseUrl.endsWith("/") ? baseUrl + "gitlab-status" : baseUrl + "/gitlab-status"
+
+    console.log("Checking GitLab status at:", apiUrl)
+
+    fetch(apiUrl, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    })
+      .then((response) => {
+        console.log("GitLab status response:", response.status, response.statusText)
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        return response.json()
+      })
       .then((status) => {
+        console.log("GitLab status data:", status)
         if (status.error_code === "TOKEN_EXPIRED") {
           showGlobalAlert("GitLab token has expired. Please update your token.", "error", {
             action: "Update Token",
@@ -44,6 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
       })
       .catch((error) => {
         console.warn("Could not check GitLab token status:", error)
+        // Don't show error alerts for token status checks to avoid spam
       })
   }
 

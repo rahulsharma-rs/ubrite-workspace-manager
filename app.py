@@ -96,6 +96,18 @@ def create_app(config_name=None):
     app.register_blueprint(ide_bp, url_prefix='/ide')
     app.register_blueprint(files_bp, url_prefix='/files')
 
+    # Add debug route to list all routes
+    @app.route('/debug/routes')
+    def list_routes():
+        routes = []
+        for rule in app.url_map.iter_rules():
+            routes.append({
+                'endpoint': rule.endpoint,
+                'methods': list(rule.methods),
+                'rule': str(rule)
+            })
+        return jsonify({'routes': routes})
+
     # Add API info endpoint
     @app.route('/api/info')
     def api_info():
