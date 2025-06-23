@@ -42,9 +42,18 @@ def get_settings():
 
             # Check token status if configured
             if settings.gitlab_pat_encrypted:
-                gitlab_service = GitLabService()
-                token_status = gitlab_service.check_token_status()
-                response_data['gitlab_status'] = token_status
+                try:
+                    gitlab_service = GitLabService()
+                    token_status = gitlab_service.check_token_status()
+                    response_data['gitlab_status'] = token_status
+                except Exception as e:
+                    logger.error(f"Error checking GitLab status: {str(e)}")
+                    response_data['gitlab_status'] = {
+                        'configured': False,
+                        'valid': False,
+                        'message': f'Status check failed: {str(e)}',
+                        'error_code': 'STATUS_ERROR'
+                    }
 
         return jsonify(response_data)
     except Exception as e:
@@ -56,9 +65,16 @@ def get_settings():
 def validate_gitlab_token():
     """Validate GitLab token before saving."""
     try:
-        data = request.json
-        token = data.get('token')
-        gitlab_url = data.get('gitlab_url', 'https://gitlab.rc.uab.edu')
+        # Handle both JSON and form data
+        if request.is_json:
+            data = request.json or {}
+        else:
+            data = request.form.to_dict()
+
+        token = data.get('token', '').strip()
+        gitlab_url = data.get('gitlab_url', 'https://gitlab.rc.uab.edu').strip()
+
+        logger.info(f"Validating GitLab token for URL: {gitlab_url}")
 
         if not token:
             return jsonify({
@@ -76,12 +92,19 @@ def validate_gitlab_token():
         if gitlab_url.endswith('/api/v4'):
             gitlab_url = gitlab_url.replace('/api/v4', '')
 
-        logger.info(f"Validating GitLab token for URL: {gitlab_url}")
+        try:
+            gitlab_service = GitLabService()
+            validation_result = gitlab_service.validate_token(token, gitlab_url=gitlab_url)
 
-        gitlab_service = GitLabService()
-        validation_result = gitlab_service.validate_token(token, gitlab_url=gitlab_url)
-
-        return jsonify(validation_result)
+            logger.info(f"Token validation result: {validation_result.get('valid', False)}")
+            return jsonify(validation_result)
+        except Exception as e:
+            logger.error(f"GitLab service error: {str(e)}")
+            return jsonify({
+                'valid': False,
+                'message': f'Service error: {str(e)}',
+                'error_code': 'SERVICE_ERROR'
+            }), 500
 
     except Exception as e:
         logger.error(f"Error validating GitLab token: {str(e)}")
@@ -98,7 +121,7 @@ def save_settings():
     try:
         # Handle both JSON and form data for backward compatibility
         if request.is_json:
-            data = request.json
+            data = request.json or {}
         else:
             data = request.form.to_dict()
             # Handle form data from old templates
@@ -115,8 +138,8 @@ def save_settings():
             db.session.add(settings)
 
         # Handle GitLab settings
-        gitlab_url = data.get('gitlab_url', 'https://gitlab.rc.uab.edu')
-        gitlab_token = data.get('gitlab_token') or data.get('gitlab_pat')  # Support both field names
+        gitlab_url = data.get('gitlab_url', 'https://gitlab.rc.uab.edu').strip()
+        gitlab_token = (data.get('gitlab_token') or data.get('gitlab_pat', '')).strip()
 
         # Always ensure we have a proper GitLab URL
         if not gitlab_url.startswith('http'):
@@ -139,16 +162,24 @@ def save_settings():
 
             if validate_token:
                 # Validate token before saving
-                gitlab_service = GitLabService()
-                validation_result = gitlab_service.validate_token(gitlab_token, gitlab_url=gitlab_url)
+                try:
+                    gitlab_service = GitLabService()
+                    validation_result = gitlab_service.validate_token(gitlab_token, gitlab_url=gitlab_url)
 
-                if not validation_result.get('valid', False):
+                    if not validation_result.get('valid', False):
+                        return jsonify({
+                            'success': False,
+                            'message': validation_result.get('message', 'Token validation failed'),
+                            'error_code': validation_result.get('error_code'),
+                            'validation_result': validation_result
+                        }), 400
+                except Exception as e:
+                    logger.error(f"Token validation failed: {str(e)}")
                     return jsonify({
                         'success': False,
-                        'message': validation_result.get('message', 'Token validation failed'),
-                        'error_code': validation_result.get('error_code'),
-                        'validation_result': validation_result
-                    }), 400
+                        'message': f'Token validation failed: {str(e)}',
+                        'error_code': 'VALIDATION_ERROR'
+                    }), 500
             else:
                 # Legacy mode - just save without validation
                 validation_result = {'valid': True, 'message': 'Token saved without validation'}
@@ -161,26 +192,35 @@ def save_settings():
             logger.info(f"GitLab token encrypted and saved")
 
             # Log the configuration
-            log_event(None, 'gitlab_token_configured', {
-                'validated': validate_token,
-                'gitlab_url': gitlab_url,
-                'user': validation_result.get('user_info', {}).get('username') if validate_token else 'unknown'
-            })
+            try:
+                log_event(None, 'gitlab_token_configured', {
+                    'validated': validate_token,
+                    'gitlab_url': gitlab_url,
+                    'user': validation_result.get('user_info', {}).get('username') if validate_token else 'unknown'
+                })
+            except Exception as e:
+                logger.warning(f"Failed to log event: {str(e)}")
 
-        # Handle other configuration options (existing code)
+        # Handle other configuration options
         conda_path = data.get('conda_path')
         if conda_path is not None:
-            config_dir = os.path.join(current_app.config['UBRITE_ROOT'], '.config')
-            os.makedirs(config_dir, exist_ok=True)
-            with open(os.path.join(config_dir, 'conda_config.json'), 'w') as f:
-                json.dump({'conda_path': conda_path}, f)
+            try:
+                config_dir = os.path.join(current_app.config['UBRITE_ROOT'], '.config')
+                os.makedirs(config_dir, exist_ok=True)
+                with open(os.path.join(config_dir, 'conda_config.json'), 'w') as f:
+                    json.dump({'conda_path': conda_path}, f)
+            except Exception as e:
+                logger.warning(f"Failed to save conda config: {str(e)}")
 
         jupyter_path = data.get('jupyter_path')
         if jupyter_path is not None:
-            config_dir = os.path.join(current_app.config['UBRITE_ROOT'], '.config')
-            os.makedirs(config_dir, exist_ok=True)
-            with open(os.path.join(config_dir, 'jupyter_config.json'), 'w') as f:
-                json.dump({'jupyter_path': jupyter_path}, f)
+            try:
+                config_dir = os.path.join(current_app.config['UBRITE_ROOT'], '.config')
+                os.makedirs(config_dir, exist_ok=True)
+                with open(os.path.join(config_dir, 'jupyter_config.json'), 'w') as f:
+                    json.dump({'jupyter_path': jupyter_path}, f)
+            except Exception as e:
+                logger.warning(f"Failed to save jupyter config: {str(e)}")
 
         db.session.commit()
         logger.info("Settings saved successfully to database")
@@ -249,9 +289,12 @@ def debug_gitlab():
         }
 
         if settings and settings.gitlab_pat_encrypted:
-            gitlab_service = GitLabService()
-            token_status = gitlab_service.check_token_status()
-            debug_info['token_status'] = token_status
+            try:
+                gitlab_service = GitLabService()
+                token_status = gitlab_service.check_token_status()
+                debug_info['token_status'] = token_status
+            except Exception as e:
+                debug_info['token_status_error'] = str(e)
 
         return jsonify(debug_info)
 
@@ -285,7 +328,11 @@ def get_git_config():
 def save_git_config():
     """Save Git configuration."""
     try:
-        data = request.json
+        if request.is_json:
+            data = request.json or {}
+        else:
+            data = request.form.to_dict()
+
         git_service = GitConfigService()
 
         # Validate configuration
