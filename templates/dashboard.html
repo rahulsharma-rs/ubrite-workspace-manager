@@ -1,1081 +1,697 @@
-{% extends 'base.html' %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UBRITE Workspace Manager - Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body>
+    {% extends "base.html" %}
 
-{% block title %}Dashboard - UBRITE{% endblock %}
+    {% block title %}Dashboard{% endblock %}
 
-{% block header %}Dashboard{% endblock %}
-
-{% block header_buttons %}
-<a href="{{ url_for('workspaces.create_workspace') }}" class="btn btn-sm btn-primary">
-    <span data-feather="plus"></span>
-    Create Workspace
-</a>
-{% endblock %}
-
-{% block content %}
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Welcome to UBRITE Project Workspace Manager</h5>
-                <p class="card-text">
-                    UBRITE helps you create and manage research workspaces with integrated Conda environments, 
-                    GitLab repositories, and in-browser IDEs.
-                </p>
-                <div class="d-grid gap-2 d-md-flex justify-content-md-start">
-                    <a href="{{ url_for('workspaces.create_workspace') }}" class="btn btn-primary">
-                        Create Workspace
-                    </a>
-                    <a href="{{ url_for('workspaces.list_workspaces') }}" class="btn btn-outline-secondary">
-                        View Workspaces
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- GitLab Token Expiration Alert (Hidden by default) -->
-<div id="gitlab-expiration-alert" class="row mb-4" style="display: none;">
-    <div class="col-md-12">
-        <div class="alert alert-warning alert-dismissible fade show" role="alert">
-            <h5 class="alert-heading">
-                <span data-feather="alert-triangle"></span>
-                GitLab Token Expiring Soon
-            </h5>
-            <p id="expiration-message">Your GitLab Personal Access Token will expire soon.</p>
-            <hr>
-            <div class="d-flex">
-                <button type="button" class="btn btn-warning btn-sm me-2" onclick="showGitLabConfig()">
-                    Update Token
-                </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="alert">
-                    Dismiss
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Environment Templates Section -->
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Available Python Environment Templates</h5>
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#templateCollapse" aria-expanded="false" aria-controls="templateCollapse">
-                    Show/Hide
-                </button>
-            </div>
-            <div class="collapse" id="templateCollapse">
-                <div class="card-body">
-                    <div class="row row-cols-1 row-cols-md-3 g-3" id="template-cards">
-                        <div class="text-center">
-                            <div class="spinner-border" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Python Environments Section -->
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Detected Python Environments</h5>
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#environmentsCollapse" aria-expanded="false" aria-controls="environmentsCollapse">
-                    Show/Hide
-                </button>
-            </div>
-            <div class="collapse" id="environmentsCollapse">
-                <div class="card-body">
-                    <div id="python-environments">
-                        <div class="text-center">
-                            <div class="spinner-border" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- JupyterLab Status Section -->
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">JupyterLab Status</h5>
-                <button id="check-jupyter-btn" class="btn btn-sm btn-outline-info">
-                    Check JupyterLab
-                </button>
-            </div>
-            <div class="card-body">
-                <div id="jupyter-status">
-                    <div class="text-center">
-                        <div class="spinner-border" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Configuration Section -->
-<h2 class="mt-5 mb-4">Configuration</h2>
-
-<!-- GitLab Configuration -->
-<div class="row mb-4" id="gitlab-config">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">
-                    GitLab Configuration
-                    <span id="gitlab-status-badge" class="badge ms-2" style="display: none;"></span>
-                </h5>
-                <div>
-                    <button id="check-gitlab-status-btn" class="btn btn-sm btn-outline-info me-2">
-                        Check Status
-                    </button>
-                    <button id="test-gitlab-btn" class="btn btn-sm btn-outline-secondary">
-                        Test Connection
-                    </button>
-                </div>
-            </div>
-            <div class="card-body">
-                <div id="gitlab-status" class="mb-3"></div>
-
-                <form id="gitlab-settings-form">
-                    <div class="mb-3">
-                        <label for="gitlab-url" class="form-label">GitLab URL</label>
-                        <input type="text" class="form-control" id="gitlab-url" name="gitlab_url"
-                               placeholder="https://gitlab.rc.uab.edu" value="https://gitlab.rc.uab.edu">
-                        <div class="form-text">
-                            Your GitLab instance URL (without /api/v4)
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="gitlab-token" class="form-label">
-                            GitLab Personal Access Token
-                            <a href="#" id="token-help-link" class="text-decoration-none ms-1" data-bs-toggle="modal" data-bs-target="#tokenHelpModal">
-                                <span data-feather="help-circle" style="width: 16px; height: 16px;"></span>
+    {% block content %}
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Dashboard</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <div class="btn-group me-2">
+                            <a href="{{ url_for('workspaces.list_workspaces') }}" class="btn btn-sm btn-outline-secondary">
+                                <i data-feather="folder"></i> Workspaces
                             </a>
-                        </label>
-                        <div class="input-group">
-                            <input type="password" class="form-control" id="gitlab-token" name="gitlab_token"
-                                   placeholder="Enter your GitLab Personal Access Token">
-                            <button class="btn btn-outline-secondary" type="button" id="validate-token-btn">
-                                <span class="spinner-border spinner-border-sm d-none" role="status"></span>
-                                <span class="btn-text">Validate</span>
+                            <a href="{{ url_for('workspaces.create_workspace') }}" class="btn btn-sm btn-primary">
+                                <i data-feather="plus"></i> New Workspace
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <i data-feather="folder" class="text-primary"></i>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <div class="small text-muted">Workspaces</div>
+                                <div class="h5 mb-0" id="workspace-count">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <i data-feather="git-branch" class="text-success"></i>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <div class="small text-muted">GitLab Status</div>
+                                <div class="h6 mb-0" id="gitlab-status">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <i data-feather="package" class="text-info"></i>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <div class="small text-muted">Conda</div>
+                                <div class="h6 mb-0" id="conda-status">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <i data-feather="code" class="text-warning"></i>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <div class="small text-muted">Jupyter</div>
+                                <div class="h6 mb-0" id="jupyter-status">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Section -->
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- GitLab Configuration -->
+                <div class="card mb-4" id="gitlab-config">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i data-feather="git-branch"></i> GitLab Configuration
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="gitlab-config-form">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="gitlab-url" class="form-label">GitLab URL</label>
+                                        <input type="url" class="form-control" id="gitlab-url" name="gitlab_url"
+                                               value="https://gitlab.rc.uab.edu" required>
+                                        <div class="form-text">Base URL of your GitLab instance</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="gitlab-token" class="form-label">Personal Access Token</label>
+                                        <div class="input-group">
+                                            <input type="password" class="form-control" id="gitlab-token" name="gitlab_token"
+                                                   placeholder="Enter your GitLab PAT">
+                                            <button class="btn btn-outline-secondary" type="button" id="toggle-token-visibility">
+                                                <i data-feather="eye"></i>
+                                            </button>
+                                        </div>
+                                        <div class="form-text">
+                                            <a href="#" data-bs-toggle="modal" data-bs-target="#token-help-modal">
+                                                How to create a Personal Access Token
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-primary" id="test-gitlab-btn">
+                                    <i data-feather="check-circle"></i> Test Connection
+                                </button>
+                                <button type="submit" class="btn btn-primary" id="save-gitlab-btn">
+                                    <i data-feather="save"></i> Save Configuration
+                                </button>
+                            </div>
+                        </form>
+
+                        <div id="gitlab-config-status" class="mt-3"></div>
+                    </div>
+                </div>
+
+                <!-- Git Configuration -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i data-feather="user"></i> Git User Configuration
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="git-config-form">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="git-user-name" class="form-label">Full Name</label>
+                                        <input type="text" class="form-control" id="git-user-name" name="git_user_name"
+                                               placeholder="Your Full Name" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="git-user-email" class="form-label">Email Address</label>
+                                        <input type="email" class="form-control" id="git-user-email" name="git_user_email"
+                                               placeholder="your.email@example.com" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-primary" id="test-git-config-btn">
+                                    <i data-feather="check-circle"></i> Test Configuration
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i data-feather="save"></i> Save Configuration
+                                </button>
+                            </div>
+                        </form>
+
+                        <div id="git-config-status" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <!-- Quick Actions -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i data-feather="zap"></i> Quick Actions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('workspaces.create_workspace') }}" class="btn btn-primary">
+                                <i data-feather="plus"></i> Create New Workspace
+                            </a>
+                            <button type="button" class="btn btn-outline-secondary" id="refresh-status-btn">
+                                <i data-feather="refresh-cw"></i> Refresh Status
+                            </button>
+                            <button type="button" class="btn btn-outline-info" id="check-system-btn">
+                                <i data-feather="activity"></i> System Health Check
                             </button>
                         </div>
-                        <div class="form-text">
-                            Required for GitLab repository creation. Token will be validated before saving.
-                        </div>
-                        <div id="token-validation-result" class="mt-2"></div>
                     </div>
-
-                    <button type="submit" class="btn btn-primary" id="save-gitlab-btn" disabled>
-                        <span class="spinner-border spinner-border-sm d-none" role="status"></span>
-                        <span class="btn-text">Save Configuration</span>
-                    </button>
-                </form>
-
-                <div id="gitlab-settings-status" class="mt-3"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Token Help Modal -->
-<div class="modal fade" id="tokenHelpModal" tabindex="-1" aria-labelledby="tokenHelpModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="tokenHelpModalLabel">Creating a GitLab Personal Access Token</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <h6>Steps to create a Personal Access Token:</h6>
-                <ol>
-                    <li>Go to your GitLab instance (e.g., <code>https://gitlab.rc.uab.edu</code>)</li>
-                    <li>Click on your avatar in the top-right corner</li>
-                    <li>Select <strong>Edit Profile</strong></li>
-                    <li>In the left sidebar, click <strong>Access Tokens</strong></li>
-                    <li>Click <strong>Add new token</strong></li>
-                    <li>Fill in the form:
-                        <ul>
-                            <li><strong>Token name:</strong> UBRITE Workspace Manager</li>
-                            <li><strong>Expiration date:</strong> Set a future date (recommended: 1 year)</li>
-                            <li><strong>Scopes:</strong> Select <code>api</code> (required for repository management)</li>
-                        </ul>
-                    </li>
-                    <li>Click <strong>Create personal access token</strong></li>
-                    <li>Copy the token immediately (you won't be able to see it again)</li>
-                    <li>Paste the token in the field above and click <strong>Validate</strong></li>
-                </ol>
-
-                <div class="alert alert-info mt-3">
-                    <h6>Required Scopes:</h6>
-                    <ul class="mb-0">
-                        <li><code>api</code> - Full API access (required for creating and managing repositories)</li>
-                    </ul>
                 </div>
 
-                <div class="alert alert-warning mt-3">
-                    <h6>Security Notes:</h6>
-                    <ul class="mb-0">
-                        <li>Keep your token secure and don't share it</li>
-                        <li>Set an expiration date for security</li>
-                        <li>You'll be notified when the token is about to expire</li>
-                        <li>The token is encrypted before being stored</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <a href="#" id="gitlab-token-link" class="btn btn-primary" target="_blank">
-                    Go to GitLab
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Git Configuration -->
-<div class="row mb-4" id="git-config">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Git User Configuration</h5>
-                <button id="test-git-config-btn" class="btn btn-sm btn-outline-secondary">
-                    Test Configuration
-                </button>
-            </div>
-            <div class="card-body">
-                <div id="git-config-status" class="mb-3"></div>
-                <form id="git-config-form">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="git-user-name" class="form-label">Git User Name</label>
-                                <input type="text" class="form-control" id="git-user-name" name="git_user_name" required>
-                                <div class="form-text">
-                                    Your name for git commits (e.g., "John Doe")
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="git-user-email" class="form-label">Git User Email</label>
-                                <input type="email" class="form-control" id="git-user-email" name="git_user_email" required>
-                                <div class="form-text">
-                                    Your email for git commits
-                                </div>
-                            </div>
-                        </div>
+                <!-- Environment Templates -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i data-feather="layers"></i> Available Templates
+                        </h5>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="git-ssh-key-path" class="form-label">SSH Key Path (Optional)</label>
-                                <input type="text" class="form-control" id="git-ssh-key-path" name="git_ssh_key_path" placeholder="~/.ssh/id_rsa">
-                                <div class="form-text">
-                                    Path to your SSH private key for git operations
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="git-signing-key" class="form-label">GPG Signing Key (Optional)</label>
-                                <input type="text" class="form-control" id="git-signing-key" name="git_signing_key" placeholder="GPG Key ID">
-                                <div class="form-text">
-                                    GPG key ID for signing commits
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="git-default-branch" class="form-label">Default Branch Name</label>
-                        <input type="text" class="form-control" id="git-default-branch" name="git_default_branch" value="main">
-                        <div class="form-text">
-                            Default branch name for new repositories
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Save Git Configuration</button>
-                </form>
-                <div id="git-config-form-status" class="mt-3"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Application Status -->
-<div class="row mb-4" id="app-status-section">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Application Status</h5>
-                <button id="refresh-status-btn" class="btn btn-sm btn-outline-secondary">
-                    <span data-feather="refresh-cw"></span>
-                    Refresh
-                </button>
-            </div>
-            <div class="card-body">
-                <div id="app-status">
-                    <div class="text-center">
-                        <div class="spinner-border" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                    <div class="card-body">
+                        <div id="env-templates-list">
+                            <div class="text-muted">Loading templates...</div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
-{% endblock %}
 
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Get the correct base URL for API calls
-    const baseUrl = window.location.origin + window.location.pathname.replace(/\/$/, '');
-    let currentGitLabStatus = null;
+    <!-- Token Help Modal -->
+    <div class="modal fade" id="token-help-modal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Creating a GitLab Personal Access Token</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ol>
+                        <li>Go to your GitLab instance: <strong id="gitlab-url-display">https://gitlab.rc.uab.edu</strong></li>
+                        <li>Click on your avatar in the top-right corner</li>
+                        <li>Select <strong>Edit Profile</strong></li>
+                        <li>In the left sidebar, click <strong>Access Tokens</strong></li>
+                        <li>Click <strong>Add new token</strong></li>
+                        <li>Fill in the form:
+                            <ul>
+                                <li><strong>Token name:</strong> UBRITE Workspace Manager</li>
+                                <li><strong>Expiration date:</strong> Set a future date (optional but recommended)</li>
+                                <li><strong>Scopes:</strong> Select <code>api</code> (required for full API access)</li>
+                            </ul>
+                        </li>
+                        <li>Click <strong>Create personal access token</strong></li>
+                        <li>Copy the token immediately (you won't be able to see it again)</li>
+                        <li>Paste the token in the form above</li>
+                    </ol>
+                    <div class="alert alert-warning">
+                        <strong>Important:</strong> Keep your token secure and don't share it with others.
+                        The token provides access to your GitLab account.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a href="#" id="gitlab-token-link" class="btn btn-primary" target="_blank">
+                        Open GitLab Token Page
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endblock %}
 
-    // Initialize page
-    loadSettings();
-    loadAppStatus();
-    loadEnvironmentTemplates();
-    loadPythonEnvironments();
-    checkJupyterStatus();
+    {% block scripts %}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
-    // Set up periodic status checks
-    setInterval(checkGitLabTokenStatus, 300000); // Check every 5 minutes
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize dashboard
+        initializeDashboard();
 
-    function loadEnvironmentTemplates() {
-        fetch(`${baseUrl}/env-templates`)
-            .then(response => response.json())
-            .then(data => {
-                const container = document.getElementById('template-cards');
+        // Load initial data
+        loadDashboardData();
 
-                if (!data.success || !data.templates || data.templates.length === 0) {
-                    container.innerHTML = '<div class="col-12"><p>No environment templates found.</p></div>';
-                    return;
-                }
-
-                // Template descriptions and icons
-                const templateInfo = {
-                    'data-science': { icon: '📊', desc: 'General data science packages (numpy, pandas, matplotlib, scikit-learn)' },
-                    'web-dev': { icon: '🌐', desc: 'Web development packages (Flask, SQLAlchemy, etc.)' },
-                    'deep-learning': { icon: '🧠', desc: 'Deep learning frameworks and tools (PyTorch, TensorFlow, transformers)' },
-                    'bioinformatics': { icon: '🧬', desc: 'Bioinformatics tools and libraries (Biopython, BLAST, samtools)' },
-                    'nlp': { icon: '📝', desc: 'Natural Language Processing libraries (NLTK, spaCy, transformers)' },
-                    'computer-vision': { icon: '👁️', desc: 'Computer Vision libraries (OpenCV, torchvision, detectron2)' },
-                    'geospatial': { icon: '🌍', desc: 'Geospatial analysis tools (GeoPandas, GDAL, rasterio)' },
-                    'scientific-computing': { icon: '🔬', desc: 'Scientific computing and simulation (FEniCS, PETSc, Numba)' },
-                    'statistics': { icon: '📈', desc: 'Statistical analysis packages (statsmodels, PyMC3, R integration)' }
-                };
-
-                let html = '';
-                data.templates.forEach(template => {
-                    const info = templateInfo[template] || { icon: '📦', desc: 'Custom environment template' };
-                    html += `
-                        <div class="col">
-                            <div class="card h-100">
-                                <div class="card-body p-3">
-                                    <h6 class="card-title">${info.icon} ${template}</h6>
-                                    <p class="card-text small">${info.desc}</p>
-                                    <a href="${baseUrl}/workspaces/create?template=${template}" class="btn btn-sm btn-outline-primary">
-                                        Use Template
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                container.innerHTML = html;
-            })
-            .catch(error => {
-                console.error('Error loading templates:', error);
-                const container = document.getElementById('template-cards');
-                container.innerHTML = '<div class="col-12"><p>Failed to load environment templates.</p></div>';
-            });
-    }
-
-    function loadPythonEnvironments() {
-        fetch(`${baseUrl}/workspaces/python-environments`)
-            .then(response => response.json())
-            .then(data => {
-                const container = document.getElementById('python-environments');
-
-                if (!data.success || !data.environments || data.environments.length === 0) {
-                    container.innerHTML = '<p>No Python environments detected.</p>';
-                    return;
-                }
-
-                let html = '<div class="table-responsive"><table class="table table-sm">';
-                html += '<thead><tr><th>Name</th><th>Type</th><th>Version</th><th>Path</th><th>Status</th></tr></thead><tbody>';
-
-                data.environments.forEach(env => {
-                    const statusBadge = env.status === 'active' ?
-                        '<span class="badge bg-success">Active</span>' :
-                        '<span class="badge bg-secondary">Available</span>';
-
-                    const typeIcon = env.type === 'conda' ? '🐍' :
-                                   env.type === 'venv' ? '📦' : '🖥️';
-
-                    html += `
-                        <tr>
-                            <td><strong>${env.name}</strong></td>
-                            <td>${typeIcon} ${env.type}</td>
-                            <td>${env.version}</td>
-                            <td><small class="text-muted">${env.path}</small></td>
-                            <td>${statusBadge}</td>
-                        </tr>
-                    `;
-                });
-
-                html += '</tbody></table></div>';
-                container.innerHTML = html;
-            })
-            .catch(error => {
-                console.error('Error loading Python environments:', error);
-                const container = document.getElementById('python-environments');
-                container.innerHTML = '<div class="alert alert-warning">Failed to load Python environments.</div>';
-            });
-    }
-
-    function checkJupyterStatus() {
-        fetch(`${baseUrl}/ide/check-jupyter`)
-            .then(response => response.json())
-            .then(data => {
-                const container = document.getElementById('jupyter-status');
-
-                if (data.success && data.available) {
-                    container.innerHTML = `
-                        <div class="alert alert-success">
-                            <h6 class="alert-heading">✓ JupyterLab Available</h6>
-                            <p class="mb-1">JupyterLab is properly installed and ready to use.</p>
-                            <small class="text-muted">Path: ${data.path || 'System PATH'}</small>
-                        </div>
-                    `;
-                } else {
-                    container.innerHTML = `
-                        <div class="alert alert-warning">
-                            <h6 class="alert-heading">⚠ JupyterLab Not Available</h6>
-                            <p class="mb-1">${data.message || 'JupyterLab is not installed or not accessible.'}</p>
-                            <small class="text-muted">Install JupyterLab: <code>pip install jupyterlab</code></small>
-                        </div>
-                    `;
-                }
-            })
-            .catch(error => {
-                console.error('Error checking Jupyter status:', error);
-                const container = document.getElementById('jupyter-status');
-                container.innerHTML = '<div class="alert alert-danger">Failed to check JupyterLab status.</div>';
-            });
-    }
-
-    // Check JupyterLab button
-    document.getElementById('check-jupyter-btn').addEventListener('click', function() {
-        const btn = this;
-        const originalText = btn.textContent;
-
-        btn.textContent = 'Checking...';
-        btn.disabled = true;
-
-        checkJupyterStatus();
-
-        setTimeout(() => {
-            btn.textContent = originalText;
-            btn.disabled = false;
-        }, 2000);
+        // Set up event listeners
+        setupEventListeners();
     });
 
-    function loadSettings() {
-        fetch(`${baseUrl}/settings`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showStatus('gitlab-status', 'Error loading settings: ' + data.message, 'error');
-                    return;
-                }
+    function initializeDashboard() {
+        console.log('Initializing dashboard...');
 
-                // Populate GitLab URL
-                if (data.gitlab_url) {
-                    document.getElementById('gitlab-url').value = data.gitlab_url;
-                    updateGitLabTokenLink(data.gitlab_url);
+        // Initialize Feather icons
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+    }
+
+    async function loadDashboardData() {
+        try {
+            // Load settings and status
+            await Promise.all([
+                loadSettings(),
+                loadAppStatus(),
+                loadEnvironmentTemplates()
+            ]);
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+        }
+    }
+
+    async function loadSettings() {
+        try {
+            const baseUrl = window.getInternalApiBaseUrl();
+            const response = await fetch(`${baseUrl}/settings`);
+
+            if (response.ok) {
+                const settings = await response.json();
+
+                // Update GitLab form
+                if (settings.gitlab_url) {
+                    document.getElementById('gitlab-url').value = settings.gitlab_url;
+                    document.getElementById('gitlab-url-display').textContent = settings.gitlab_url;
+                    document.getElementById('gitlab-token-link').href = `${settings.gitlab_url}/-/profile/personal_access_tokens`;
                 }
 
                 // Update GitLab status
-                if (data.gitlab_status) {
-                    currentGitLabStatus = data.gitlab_status;
-                    updateGitLabStatusDisplay(data.gitlab_status);
-
-                    // Check for expiring token
-                    if (data.gitlab_status.error_code === 'TOKEN_EXPIRING_SOON') {
-                        showTokenExpirationAlert(data.gitlab_status);
-                    }
-                } else if (data.has_gitlab_pat) {
-                    showStatus('gitlab-status', 'GitLab token configured', 'success');
-                    updateGitLabStatusBadge('configured', 'bg-success');
-                } else {
-                    showStatus('gitlab-status', 'GitLab token not configured', 'warning');
-                    updateGitLabStatusBadge('not configured', 'bg-warning');
-                }
-
-                // Populate Git config
-                if (data.git_user_name) {
-                    document.getElementById('git-user-name').value = data.git_user_name;
-                }
-                if (data.git_user_email) {
-                    document.getElementById('git-user-email').value = data.git_user_email;
-                }
-                if (data.git_ssh_key_path) {
-                    document.getElementById('git-ssh-key-path').value = data.git_ssh_key_path;
-                }
-                if (data.git_signing_key) {
-                    document.getElementById('git-signing-key').value = data.git_signing_key;
-                }
-                if (data.git_default_branch) {
-                    document.getElementById('git-default-branch').value = data.git_default_branch;
-                }
-            })
-            .catch(error => {
-                console.error('Error loading settings:', error);
-                showStatus('gitlab-status', 'Failed to load settings', 'error');
-            });
-    }
-
-    function updateGitLabTokenLink(gitlabUrl) {
-        const link = document.getElementById('gitlab-token-link');
-        if (link && gitlabUrl) {
-            const baseUrl = gitlabUrl.replace('/api/v4', '');
-            link.href = `${baseUrl}/-/profile/personal_access_tokens`;
-        }
-    }
-
-    function updateGitLabStatusDisplay(status) {
-        if (!status.configured) {
-            showStatus('gitlab-status', 'GitLab token not configured', 'warning');
-            updateGitLabStatusBadge('not configured', 'bg-warning');
-            return;
-        }
-
-        if (!status.valid) {
-            let message = status.message || 'Token validation failed';
-            let alertType = 'error';
-
-            if (status.error_code === 'TOKEN_EXPIRED') {
-                alertType = 'error';
-                message = 'GitLab token has expired. Please update your token.';
-            } else if (status.error_code === 'TOKEN_EXPIRING_SOON') {
-                alertType = 'warning';
+                updateGitLabStatus(settings.gitlab_status);
             }
+        } catch (error) {
+            console.error('Error loading settings:', error);
+        }
+    }
 
-            showStatus('gitlab-status', message, alertType);
-            updateGitLabStatusBadge('invalid', 'bg-danger');
+    async function loadAppStatus() {
+        try {
+            const baseUrl = window.getInternalApiBaseUrl();
+            const response = await fetch(`${baseUrl}/app-status`);
+
+            if (response.ok) {
+                const status = await response.json();
+                updateStatusCards(status);
+            }
+        } catch (error) {
+            console.error('Error loading app status:', error);
+        }
+    }
+
+    async function loadEnvironmentTemplates() {
+        try {
+            const baseUrl = window.getInternalApiBaseUrl();
+            const response = await fetch(`${baseUrl}/env-templates`);
+
+            if (response.ok) {
+                const data = await response.json();
+                updateEnvironmentTemplates(data.templates || []);
+            }
+        } catch (error) {
+            console.error('Error loading environment templates:', error);
+            updateEnvironmentTemplates([]);
+        }
+    }
+
+    function updateStatusCards(status) {
+        // Update workspace count
+        const workspaceCount = status.workspaces?.length || 0;
+        document.getElementById('workspace-count').textContent = workspaceCount;
+
+        // Update GitLab status
+        const gitlabStatus = status.gitlab?.success ? 'Connected' : 'Not Connected';
+        document.getElementById('gitlab-status').textContent = gitlabStatus;
+        document.getElementById('gitlab-status').className = status.gitlab?.success ? 'h6 mb-0 text-success' : 'h6 mb-0 text-danger';
+
+        // Update Conda status
+        const condaStatus = status.conda?.available ? 'Available' : 'Not Available';
+        document.getElementById('conda-status').textContent = condaStatus;
+        document.getElementById('conda-status').className = status.conda?.available ? 'h6 mb-0 text-success' : 'h6 mb-0 text-warning';
+
+        // Update Jupyter status
+        const jupyterStatus = status.jupyter?.available ? 'Available' : 'Not Available';
+        document.getElementById('jupyter-status').textContent = jupyterStatus;
+        document.getElementById('jupyter-status').className = status.jupyter?.available ? 'h6 mb-0 text-success' : 'h6 mb-0 text-warning';
+    }
+
+    function updateGitLabStatus(status) {
+        if (!status) return;
+
+        const statusElement = document.getElementById('gitlab-status');
+        if (status.valid) {
+            statusElement.textContent = 'Connected';
+            statusElement.className = 'h6 mb-0 text-success';
         } else {
-            let message = status.message || 'GitLab token is valid';
-            let alertType = 'success';
-            let badgeClass = 'bg-success';
-
-            if (status.error_code === 'TOKEN_EXPIRING_SOON') {
-                alertType = 'warning';
-                badgeClass = 'bg-warning';
-            } else if (status.error_code === 'INSUFFICIENT_SCOPES') {
-                alertType = 'warning';
-                badgeClass = 'bg-warning';
-            }
-
-            showStatus('gitlab-status', message, alertType);
-            updateGitLabStatusBadge('valid', badgeClass);
+            statusElement.textContent = 'Not Connected';
+            statusElement.className = 'h6 mb-0 text-danger';
         }
     }
 
-    function updateGitLabStatusBadge(text, className) {
-        const badge = document.getElementById('gitlab-status-badge');
-        if (badge) {
-            badge.textContent = text;
-            badge.className = `badge ms-2 ${className}`;
-            badge.style.display = 'inline';
-        }
-    }
+    function updateEnvironmentTemplates(templates) {
+        const container = document.getElementById('env-templates-list');
 
-    function showTokenExpirationAlert(status) {
-        const alert = document.getElementById('gitlab-expiration-alert');
-        const message = document.getElementById('expiration-message');
-
-        if (alert && message) {
-            let expirationText = 'Your GitLab Personal Access Token will expire soon.';
-
-            if (status.token_info && status.token_info.expires_at) {
-                try {
-                    const expiresAt = new Date(status.token_info.expires_at);
-                    const daysUntilExpiry = Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24));
-                    expirationText = `Your GitLab Personal Access Token will expire in ${daysUntilExpiry} days (${expiresAt.toLocaleDateString()}).`;
-                } catch (e) {
-                    console.warn('Could not parse expiration date:', e);
-                }
-            }
-
-            message.textContent = expirationText;
-            alert.style.display = 'block';
-        }
-    }
-
-    function showGitLabConfig() {
-        document.getElementById('gitlab-config').scrollIntoView({ behavior: 'smooth' });
-        document.getElementById('gitlab-token').focus();
-    }
-
-    // Make showGitLabConfig available globally
-    window.showGitLabConfig = showGitLabConfig;
-
-    function checkGitLabTokenStatus() {
-        fetch(`${baseUrl}/gitlab-status`)
-            .then(response => response.json())
-            .then(status => {
-                currentGitLabStatus = status;
-                updateGitLabStatusDisplay(status);
-
-                // Show expiration alert if needed
-                if (status.error_code === 'TOKEN_EXPIRING_SOON') {
-                    showTokenExpirationAlert(status);
-                }
-            })
-            .catch(error => {
-                console.error('Error checking GitLab status:', error);
-            });
-    }
-
-    // Token validation
-    document.getElementById('validate-token-btn').addEventListener('click', function() {
-        const token = document.getElementById('gitlab-token').value.trim();
-        const gitlabUrl = document.getElementById('gitlab-url').value.trim();
-        const btn = this;
-        const spinner = btn.querySelector('.spinner-border');
-        const btnText = btn.querySelector('.btn-text');
-        const resultDiv = document.getElementById('token-validation-result');
-        const saveBtn = document.getElementById('save-gitlab-btn');
-
-        if (!token) {
-            showValidationResult('Token is required', 'error');
+        if (templates.length === 0) {
+            container.innerHTML = '<div class="text-muted">No templates available</div>';
             return;
         }
 
-        // Show loading state
-        spinner.classList.remove('d-none');
-        btnText.textContent = 'Validating...';
-        btn.disabled = true;
-        resultDiv.innerHTML = '';
-        saveBtn.disabled = true;
+        const templateList = templates.map(template =>
+            `<div class="badge bg-secondary me-1 mb-1">${template}</div>`
+        ).join('');
 
-        fetch(`${baseUrl}/validate-gitlab-token`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                token: token,
-                gitlab_url: gitlabUrl
-            })
-        })
-        .then(response => response.json())
-        .then(result => {
+        container.innerHTML = templateList;
+    }
+
+    function setupEventListeners() {
+        // GitLab configuration
+        document.getElementById('gitlab-config-form').addEventListener('submit', handleGitLabConfigSave);
+        document.getElementById('test-gitlab-btn').addEventListener('click', handleGitLabTest);
+        document.getElementById('toggle-token-visibility').addEventListener('click', toggleTokenVisibility);
+
+        // Git configuration
+        document.getElementById('git-config-form').addEventListener('submit', handleGitConfigSave);
+        document.getElementById('test-git-config-btn').addEventListener('click', handleGitConfigTest);
+
+        // Quick actions
+        document.getElementById('refresh-status-btn').addEventListener('click', loadAppStatus);
+        document.getElementById('check-system-btn').addEventListener('click', handleSystemHealthCheck);
+
+        // Update GitLab URL display when URL changes
+        document.getElementById('gitlab-url').addEventListener('input', function() {
+            const url = this.value || 'https://gitlab.rc.uab.edu';
+            document.getElementById('gitlab-url-display').textContent = url;
+            document.getElementById('gitlab-token-link').href = `${url}/-/profile/personal_access_tokens`;
+        });
+    }
+
+    async function handleGitLabTest(event) {
+        event.preventDefault();
+
+        const testBtn = document.getElementById('test-gitlab-btn');
+        const statusDiv = document.getElementById('gitlab-config-status');
+
+        // Get form data
+        const gitlabUrl = document.getElementById('gitlab-url').value.trim();
+        const gitlabToken = document.getElementById('gitlab-token').value.trim();
+
+        if (!gitlabToken) {
+            showStatus(statusDiv, 'Please enter a GitLab token to test', 'error');
+            return;
+        }
+
+        try {
+            // Update button state
+            testBtn.disabled = true;
+            testBtn.innerHTML = '<i data-feather="loader"></i> Testing...';
+            feather.replace();
+
+            showStatus(statusDiv, 'Testing GitLab connection...', 'loading');
+
+            // Call validation endpoint with form data (not saved data)
+            const baseUrl = window.getInternalApiBaseUrl();
+            const response = await fetch(`${baseUrl}/validate-gitlab-token`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    gitlab_url: gitlabUrl,
+                    token: gitlabToken
+                })
+            });
+
+            const result = await response.json();
+
             if (result.valid) {
-                let message = `✓ Token is valid for user: ${result.user_info?.name || 'Unknown'}`;
+                const userInfo = result.user_info || {};
+                const message = `✅ Connection successful! Connected as ${userInfo.name || 'Unknown'} (${userInfo.username || 'unknown'})`;
+                showStatus(statusDiv, message, 'success');
 
-                if (result.scopes && result.scopes.length > 0) {
-                    message += `<br><small>Scopes: ${result.scopes.join(', ')}</small>`;
-                }
-
-                if (result.expires_at) {
-                    try {
-                        const expiresAt = new Date(result.expires_at);
-                        const daysUntilExpiry = Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24));
-                        message += `<br><small>Expires: ${expiresAt.toLocaleDateString()} (${daysUntilExpiry} days)</small>`;
-                    } catch (e) {
-                        console.warn('Could not parse expiration date:', e);
-                    }
-                }
-
-                let alertType = 'success';
-                if (result.error_code === 'TOKEN_EXPIRING_SOON') {
-                    alertType = 'warning';
-                } else if (result.error_code === 'INSUFFICIENT_SCOPES') {
-                    alertType = 'warning';
-                    message += '<br><small class="text-warning">⚠ Warning: Token may not have all required scopes</small>';
-                }
-
-                showValidationResult(message, alertType);
-                saveBtn.disabled = false;
+                // Update the save button to indicate ready to save
+                const saveBtn = document.getElementById('save-gitlab-btn');
+                saveBtn.classList.remove('btn-primary');
+                saveBtn.classList.add('btn-success');
+                saveBtn.innerHTML = '<i data-feather="save"></i> Save Validated Configuration';
+                feather.replace();
             } else {
-                let message = result.message || 'Token validation failed';
-
-                if (result.error_code === 'INVALID_TOKEN') {
-                    message = '✗ Invalid token or token has expired';
-                } else if (result.error_code === 'INSUFFICIENT_PERMISSIONS') {
-                    message = '✗ Token does not have sufficient permissions. Make sure it has "api" scope.';
-                } else if (result.error_code === 'API_NOT_FOUND') {
-                    message = '✗ GitLab API not found. Please check the GitLab URL.';
-                } else if (result.error_code === 'CONNECTION_ERROR') {
-                    message = '✗ Could not connect to GitLab. Please check the URL and your network connection.';
-                }
-
-                showValidationResult(message, 'error');
-                saveBtn.disabled = true;
+                showStatus(statusDiv, `❌ Connection failed: ${result.message}`, 'error');
             }
-        })
-        .catch(error => {
-            console.error('Error validating token:', error);
-            showValidationResult('Validation failed: ' + error.message, 'error');
+
+        } catch (error) {
+            console.error('GitLab test error:', error);
+            showStatus(statusDiv, `❌ Test failed: ${error.message}`, 'error');
+        } finally {
+            // Reset button state
+            testBtn.disabled = false;
+            testBtn.innerHTML = '<i data-feather="check-circle"></i> Test Connection';
+            feather.replace();
+        }
+    }
+
+    async function handleGitLabConfigSave(event) {
+        event.preventDefault();
+
+        const form = event.target;
+        const formData = new FormData(form);
+        const saveBtn = document.getElementById('save-gitlab-btn');
+        const statusDiv = document.getElementById('gitlab-config-status');
+
+        try {
+            // Update button state
             saveBtn.disabled = true;
-        })
-        .finally(() => {
+            saveBtn.innerHTML = '<i data-feather="loader"></i> Saving...';
+            feather.replace();
+
+            showStatus(statusDiv, 'Saving GitLab configuration...', 'loading');
+
+            // Convert FormData to JSON
+            const data = {};
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+
+            const baseUrl = window.getInternalApiBaseUrl();
+            const response = await fetch(`${baseUrl}/settings`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showStatus(statusDiv, '✅ GitLab configuration saved successfully!', 'success');
+
+                // Reset save button
+                saveBtn.classList.remove('btn-success');
+                saveBtn.classList.add('btn-primary');
+                saveBtn.innerHTML = '<i data-feather="save"></i> Save Configuration';
+                feather.replace();
+
+                // Refresh status
+                await loadAppStatus();
+            } else {
+                showStatus(statusDiv, `❌ Save failed: ${result.message}`, 'error');
+            }
+
+        } catch (error) {
+            console.error('GitLab save error:', error);
+            showStatus(statusDiv, `❌ Save failed: ${error.message}`, 'error');
+        } finally {
             // Reset button state
-            spinner.classList.add('d-none');
-            btnText.textContent = 'Validate';
-            btn.disabled = false;
-        });
-    });
-
-    function showValidationResult(message, type) {
-        const resultDiv = document.getElementById('token-validation-result');
-        const alertClass = type === 'success' ? 'alert-success' :
-                          type === 'warning' ? 'alert-warning' : 'alert-danger';
-
-        resultDiv.innerHTML = `<div class="alert ${alertClass} mb-0">${message}</div>`;
+            saveBtn.disabled = false;
+            if (saveBtn.innerHTML.includes('Saving')) {
+                saveBtn.innerHTML = '<i data-feather="save"></i> Save Configuration';
+                feather.replace();
+            }
+        }
     }
 
-    // GitLab settings form submission
-    document.getElementById('gitlab-settings-form').addEventListener('submit', function(e) {
-        e.preventDefault();
+    async function handleGitConfigSave(event) {
+        event.preventDefault();
 
-        const formData = new FormData(this);
-        const data = Object.fromEntries(formData.entries());
-        const btn = document.getElementById('save-gitlab-btn');
-        const spinner = btn.querySelector('.spinner-border');
-        const btnText = btn.querySelector('.btn-text');
+        const form = event.target;
+        const formData = new FormData(form);
+        const statusDiv = document.getElementById('git-config-status');
 
-        // Show loading state
-        spinner.classList.remove('d-none');
-        btnText.textContent = 'Saving...';
-        btn.disabled = true;
+        try {
+            showStatus(statusDiv, 'Saving Git configuration...', 'loading');
 
-        fetch(`${baseUrl}/settings`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                showStatus('gitlab-settings-status', 'GitLab configuration saved successfully!', 'success');
-
-                // Clear the token field for security
-                document.getElementById('gitlab-token').value = '';
-                document.getElementById('token-validation-result').innerHTML = '';
-
-                // Update status display
-                if (result.validation_result) {
-                    currentGitLabStatus = result.validation_result;
-                    updateGitLabStatusDisplay(result.validation_result);
-                }
-
-                // Reload settings to get updated status
-                setTimeout(loadSettings, 1000);
-            } else {
-                let message = result.message || 'Failed to save configuration';
-
-                if (result.validation_result && !result.validation_result.valid) {
-                    message += '<br>Token validation failed: ' + result.validation_result.message;
-                }
-
-                showStatus('gitlab-settings-status', message, 'error');
+            // Convert FormData to JSON
+            const data = {};
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
             }
-        })
-        .catch(error => {
-            console.error('Error saving settings:', error);
-            showStatus('gitlab-settings-status', 'Error saving configuration: ' + error.message, 'error');
-        })
-        .finally(() => {
-            // Reset button state
-            spinner.classList.add('d-none');
-            btnText.textContent = 'Save Configuration';
-            btn.disabled = false;
-        });
-    });
 
-    // Git config form submission
-    document.getElementById('git-config-form').addEventListener('submit', function(e) {
-        e.preventDefault();
+            const baseUrl = window.getInternalApiBaseUrl();
+            const response = await fetch(`${baseUrl}/git-config`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
 
-        const formData = new FormData(this);
-        const data = Object.fromEntries(formData.entries());
+            const result = await response.json();
 
-        fetch(`${baseUrl}/git-config`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        })
-        .then(response => response.json())
-        .then(result => {
             if (result.success) {
-                showStatus('git-config-form-status', 'Git configuration saved successfully!', 'success');
+                showStatus(statusDiv, '✅ Git configuration saved successfully!', 'success');
             } else {
-                showStatus('git-config-form-status', result.message || 'Failed to save git configuration', 'error');
+                showStatus(statusDiv, `❌ Save failed: ${result.message}`, 'error');
             }
-        })
-        .catch(error => {
-            console.error('Error saving git config:', error);
-            showStatus('git-config-form-status', 'Error saving git configuration: ' + error.message, 'error');
-        });
-    });
 
-    // Check GitLab status button
-    document.getElementById('check-gitlab-status-btn').addEventListener('click', function() {
-        const btn = this;
-        const originalText = btn.textContent;
-
-        btn.textContent = 'Checking...';
-        btn.disabled = true;
-
-        checkGitLabTokenStatus();
-
-        setTimeout(() => {
-            btn.textContent = originalText;
-            btn.disabled = false;
-        }, 2000);
-    });
-
-    // Test GitLab connection
-    document.getElementById('test-gitlab-btn').addEventListener('click', function() {
-        const btn = this;
-        const originalText = btn.textContent;
-
-        btn.textContent = 'Testing...';
-        btn.disabled = true;
-
-        fetch(`${baseUrl}/test-gitlab`)
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    let message = `✓ ${result.message}`;
-                    if (result.details) {
-                        message += `<br><small>${result.details}</small>`;
-                    }
-
-                    const alertType = result.warning ? 'warning' : 'success';
-                    showStatus('gitlab-status', message, alertType);
-                    updateGitLabStatusBadge('connected', 'bg-success');
-                } else {
-                    let message = `✗ ${result.message}`;
-                    if (result.details) {
-                        message += `<br><small>${result.details}</small>`;
-                    }
-
-                    showStatus('gitlab-status', message, 'error');
-                    updateGitLabStatusBadge('failed', 'bg-danger');
-                }
-            })
-            .catch(error => {
-                console.error('Error testing GitLab:', error);
-                showStatus('gitlab-status', 'Connection test failed: ' + error.message, 'error');
-                updateGitLabStatusBadge('error', 'bg-danger');
-            })
-            .finally(() => {
-                btn.textContent = originalText;
-                btn.disabled = false;
-            });
-    });
-
-    // Test git config button
-    document.getElementById('test-git-config-btn').addEventListener('click', function() {
-        const btn = this;
-        const originalText = btn.textContent;
-
-        btn.textContent = 'Testing...';
-        btn.disabled = true;
-
-        fetch(`${baseUrl}/test-git-config`)
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    showStatus('git-config-status', '✓ Git configuration is valid', 'success');
-                } else {
-                    showStatus('git-config-status', '✗ ' + (result.message || 'Git configuration test failed'), 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Error testing git config:', error);
-                showStatus('git-config-status', 'Git configuration test failed: ' + error.message, 'error');
-            })
-            .finally(() => {
-                btn.textContent = originalText;
-                btn.disabled = false;
-            });
-    });
-
-    // Load application status
-    function loadAppStatus() {
-        fetch(`${baseUrl}/app-status`)
-            .then(response => response.json())
-            .then(data => {
-                const statusDiv = document.getElementById('app-status');
-
-                if (data.error) {
-                    statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${data.message}</div>`;
-                    return;
-                }
-
-                let html = '<div class="row">';
-
-                // System Status
-                html += '<div class="col-md-6"><h6>System Status</h6><ul class="list-group mb-3">';
-
-                // Directories
-                if (data.directories) {
-                    Object.entries(data.directories).forEach(([key, value]) => {
-                        const status = value ? 'success' : 'danger';
-                        const text = value ? 'OK' : 'Missing';
-                        html += `
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                ${key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                <span class="badge bg-${status}">${text}</span>
-                            </li>
-                        `;
-                    });
-                }
-
-                // Database
-                const dbStatus = data.database ? 'success' : 'danger';
-                const dbText = data.database ? 'Connected' : 'Error';
-                html += `
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Database
-                        <span class="badge bg-${dbStatus}">${dbText}</span>
-                    </li>
-                `;
-
-                html += '</ul></div>';
-
-                // Services Status
-                html += '<div class="col-md-6"><h6>Services Status</h6><ul class="list-group mb-3">';
-
-                // GitLab
-                if (data.gitlab) {
-                    const gitlabStatus = data.gitlab.success ? 'success' : 'danger';
-                    const gitlabText = data.gitlab.success ? 'Connected' : 'Error';
-                    html += `
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            GitLab
-                            <span class="badge bg-${gitlabStatus}">${gitlabText}</span>
-                        </li>
-                    `;
-                }
-
-                // Conda
-                if (data.conda) {
-                    const condaStatus = data.conda.available ? 'success' : 'warning';
-                    const condaText = data.conda.available ? 'Available' : 'Not Found';
-                    html += `
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Conda
-                            <span class="badge bg-${condaStatus}">${condaText}</span>
-                        </li>
-                    `;
-                }
-
-                // Jupyter
-                if (data.jupyter) {
-                    const jupyterStatus = data.jupyter.available ? 'success' : 'warning';
-                    const jupyterText = data.jupyter.available ? 'Available' : 'Not Found';
-                    html += `
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            JupyterLab
-                            <span class="badge bg-${jupyterStatus}">${jupyterText}</span>
-                        </li>
-                    `;
-                }
-
-                html += '</ul></div></div>';
-
-                statusDiv.innerHTML = html;
-            })
-            .catch(error => {
-                console.error('Error loading app status:', error);
-                const statusDiv = document.getElementById('app-status');
-                statusDiv.innerHTML = `<div class="alert alert-danger">Failed to load application status: ${error.message}</div>`;
-            });
+        } catch (error) {
+            console.error('Git config save error:', error);
+            showStatus(statusDiv, `❌ Save failed: ${error.message}`, 'error');
+        }
     }
 
-    // Refresh status button
-    document.getElementById('refresh-status-btn').addEventListener('click', function() {
-        const btn = this;
-        const icon = btn.querySelector('[data-feather]');
+    async function handleGitConfigTest(event) {
+        event.preventDefault();
 
-        // Add spinning animation
-        icon.style.animation = 'spin 1s linear infinite';
-        btn.disabled = true;
+        const statusDiv = document.getElementById('git-config-status');
 
-        loadAppStatus();
-        loadPythonEnvironments();
-        checkJupyterStatus();
+        try {
+            showStatus(statusDiv, 'Testing Git configuration...', 'loading');
 
-        setTimeout(() => {
-            icon.style.animation = '';
+            const baseUrl = window.getInternalApiBaseUrl();
+            const response = await fetch(`${baseUrl}/test-git-config`);
+            const result = await response.json();
+
+            if (result.success) {
+                showStatus(statusDiv, '✅ Git configuration is valid!', 'success');
+            } else {
+                showStatus(statusDiv, `❌ Test failed: ${result.message}`, 'error');
+            }
+
+        } catch (error) {
+            console.error('Git config test error:', error);
+            showStatus(statusDiv, `❌ Test failed: ${error.message}`, 'error');
+        }
+    }
+
+    async function handleSystemHealthCheck() {
+        const btn = document.getElementById('check-system-btn');
+
+        try {
+            btn.disabled = true;
+            btn.innerHTML = '<i data-feather="loader"></i> Checking...';
+            feather.replace();
+
+            await loadAppStatus();
+
+            window.showGlobalAlert('System health check completed!', 'success');
+
+        } catch (error) {
+            console.error('System health check error:', error);
+            window.showGlobalAlert('System health check failed', 'error');
+        } finally {
             btn.disabled = false;
-        }, 2000);
-    });
+            btn.innerHTML = '<i data-feather="activity"></i> System Health Check';
+            feather.replace();
+        }
+    }
 
-    // Utility function to show status messages
-    function showStatus(elementId, message, type = 'info') {
-        const element = document.getElementById(elementId);
+    function toggleTokenVisibility() {
+        const tokenInput = document.getElementById('gitlab-token');
+        const toggleBtn = document.getElementById('toggle-token-visibility');
+
+        if (tokenInput.type === 'password') {
+            tokenInput.type = 'text';
+            toggleBtn.innerHTML = '<i data-feather="eye-off"></i>';
+        } else {
+            tokenInput.type = 'password';
+            toggleBtn.innerHTML = '<i data-feather="eye"></i>';
+        }
+
+        feather.replace();
+    }
+
+    function showStatus(element, message, type = 'info') {
         if (!element) return;
 
-        const alertClass = type === 'success' ? 'alert-success' :
-                          type === 'warning' ? 'alert-warning' :
-                          type === 'error' ? 'alert-danger' : 'alert-info';
+        element.innerHTML = '';
 
-        element.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${getBootstrapClass(type)} mt-2`;
+        alertDiv.textContent = message;
 
-        // Auto-hide success messages after 5 seconds
+        element.appendChild(alertDiv);
+
         if (type === 'success') {
             setTimeout(() => {
-                element.innerHTML = '';
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
             }, 5000);
         }
     }
 
-    // Initialize Feather icons
-    if (typeof feather !== 'undefined') {
-        feather.replace();
+    function getBootstrapClass(type) {
+        const classMap = {
+            loading: 'info',
+            success: 'success',
+            error: 'danger',
+            warning: 'warning',
+            info: 'info'
+        };
+        return classMap[type] || 'info';
     }
-});
-
-// Add CSS for spinning animation
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-    }
-`;
-document.head.appendChild(style);
-</script>
-{% endblock %}
+    </script>
+    {% endblock %}
+</body>
+</html>
