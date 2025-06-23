@@ -108,6 +108,39 @@ def create_app(config_name=None):
             })
         return jsonify({'routes': routes})
 
+    # Add database initialization route
+    @app.route('/debug/init-db')
+    def init_database():
+        try:
+            from models import Settings
+            from utils.encryption import generate_key
+
+            # Check if settings exist
+            settings = Settings.query.first()
+            if not settings:
+                settings = Settings()
+                settings.encryption_key = generate_key()
+                settings.gitlab_url = 'https://gitlab.rc.uab.edu/api/v4'
+                db.session.add(settings)
+                db.session.commit()
+                return jsonify({
+                    'success': True,
+                    'message': 'Database initialized with default settings',
+                    'gitlab_url': settings.gitlab_url
+                })
+            else:
+                return jsonify({
+                    'success': True,
+                    'message': 'Settings already exist',
+                    'gitlab_url': settings.gitlab_url,
+                    'has_token': bool(settings.gitlab_pat_encrypted)
+                })
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Database initialization failed: {str(e)}'
+            }), 500
+
     # Add API info endpoint
     @app.route('/api/info')
     def api_info():
@@ -172,6 +205,18 @@ def create_app(config_name=None):
             # Run database migrations
             from utils.db_migrations import run_migrations
             run_migrations()
+
+            # Initialize default settings
+            from models import Settings
+            from utils.encryption import generate_key
+            settings = Settings.query.first()
+            if not settings:
+                settings = Settings()
+                settings.encryption_key = generate_key()
+                settings.gitlab_url = 'https://gitlab.rc.uab.edu/api/v4'
+                db.session.add(settings)
+                db.session.commit()
+                app.logger.info(f"Created default settings with GitLab URL: {settings.gitlab_url}")
 
         except Exception as e:
             app.logger.error(f"Error during app initialization: {str(e)}")

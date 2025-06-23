@@ -23,6 +23,28 @@ class GitLabService:
         self._gitlab_url = None
         self._token = None
 
+    def _ensure_settings_exist(self):
+        """Ensure settings record exists with default GitLab URL."""
+        try:
+            settings = Settings.query.first()
+            if not settings:
+                self.logger.info("Creating default settings record")
+                settings = Settings()
+                settings.encryption_key = generate_key()
+                settings.gitlab_url = self.DEFAULT_GITLAB_API_URL
+                db.session.add(settings)
+                db.session.commit()
+                self.logger.info(f"Created settings with GitLab URL: {settings.gitlab_url}")
+            elif not hasattr(settings, 'gitlab_url') or not settings.gitlab_url:
+                self.logger.info("Setting default GitLab URL in existing settings")
+                settings.gitlab_url = self.DEFAULT_GITLAB_API_URL
+                db.session.commit()
+                self.logger.info(f"Updated settings with GitLab URL: {settings.gitlab_url}")
+            return settings
+        except Exception as e:
+            self.logger.error(f"Error ensuring settings exist: {str(e)}")
+            return None
+
     def get_analytics_service(self):
         """Get analytics service instance."""
         try:
@@ -36,12 +58,12 @@ class GitLabService:
     def api_url(self):
         """Get GitLab API URL - always use the external GitLab instance."""
         if self._api_url is None:
-            settings = Settings.query.first()
-            if settings and hasattr(settings, 'gitlab_url') and settings.gitlab_url:
+            settings = self._ensure_settings_exist()
+            if settings and settings.gitlab_url:
                 self._api_url = settings.gitlab_url
                 self.logger.info(f"Using configured GitLab API URL: {self._api_url}")
             else:
-                # Default to UAB GitLab instance
+                # Fallback to default
                 self._api_url = self.DEFAULT_GITLAB_API_URL
                 self.logger.info(f"Using default GitLab API URL: {self._api_url}")
         return self._api_url
@@ -50,13 +72,13 @@ class GitLabService:
     def gitlab_url(self):
         """Get GitLab base URL from settings."""
         if self._gitlab_url is None:
-            settings = Settings.query.first()
-            if settings and hasattr(settings, 'gitlab_url') and settings.gitlab_url:
+            settings = self._ensure_settings_exist()
+            if settings and settings.gitlab_url:
                 # Remove /api/v4 to get base URL
                 self._gitlab_url = settings.gitlab_url.replace('/api/v4', '')
                 self.logger.info(f"Using configured GitLab base URL: {self._gitlab_url}")
             else:
-                # Default to UAB GitLab instance
+                # Fallback to default
                 self._gitlab_url = self.DEFAULT_GITLAB_BASE_URL
                 self.logger.info(f"Using default GitLab base URL: {self._gitlab_url}")
         return self._gitlab_url
@@ -65,7 +87,7 @@ class GitLabService:
     def token(self):
         """Get decrypted GitLab token from settings."""
         if self._token is None:
-            settings = Settings.query.first()
+            settings = self._ensure_settings_exist()
             if settings and settings.gitlab_pat_encrypted and settings.encryption_key:
                 try:
                     self._token = decrypt_data(settings.gitlab_pat_encrypted, settings.encryption_key)
@@ -214,20 +236,11 @@ class GitLabService:
             dict: Token status information
         """
         try:
-            # Always ensure we have a GitLab URL
+            # Ensure settings exist and get GitLab URL
+            settings = self._ensure_settings_exist()
             gitlab_url = self.gitlab_url
-            if not gitlab_url:
-                # Set default and save it
-                settings = Settings.query.first()
-                if not settings:
-                    settings = Settings()
-                    settings.encryption_key = generate_key()
-                    db.session.add(settings)
 
-                settings.gitlab_url = self.DEFAULT_GITLAB_API_URL
-                db.session.commit()
-                gitlab_url = self.DEFAULT_GITLAB_BASE_URL
-                self.logger.info(f"Set default GitLab URL: {gitlab_url}")
+            self.logger.info(f"Checking token status for GitLab URL: {gitlab_url}")
 
             if not self.token:
                 return {
@@ -296,7 +309,7 @@ class GitLabService:
         except Exception as e:
             self.logger.error(f"Error checking token status: {str(e)}")
             return {
-                'configured': True,
+                'configured': False,
                 'valid': False,
                 'message': f'Status check failed: {str(e)}',
                 'error_code': 'STATUS_ERROR',
