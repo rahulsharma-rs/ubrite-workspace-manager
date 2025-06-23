@@ -4,7 +4,6 @@ from flask_wtf.csrf import CSRFProtect
 from config import config
 from extensions import db, socketio, cors
 from utils.filesystem import ensure_directories
-from utils.db_migrations import run_migrations
 import os
 import socket
 import logging
@@ -58,15 +57,20 @@ def create_app(config_name=None):
             print(f"Error loading jupyter config: {str(e)}")
 
     # Configure logging
-    os.makedirs(app.config['LOGS_DIR'], exist_ok=True)
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler(os.path.join(app.config['LOGS_DIR'], 'app.log'))
-        ]
-    )
+    try:
+        os.makedirs(app.config['LOGS_DIR'], exist_ok=True)
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.StreamHandler(),
+                logging.FileHandler(os.path.join(app.config['LOGS_DIR'], 'app.log'))
+            ]
+        )
+    except Exception as e:
+        print(f"Error setting up logging: {str(e)}")
+        # Fallback to basic logging
+        logging.basicConfig(level=logging.INFO)
 
     # Initialize extensions
     db.init_app(app)
@@ -84,17 +88,21 @@ def create_app(config_name=None):
                       async_mode='threading')
 
     # Import and register blueprints
-    from blueprints.dashboard import dashboard_bp
-    from blueprints.workspaces import workspaces_bp
-    from blueprints.git import git_bp
-    from blueprints.ide import ide_bp
-    from blueprints.files import files_bp
+    try:
+        from blueprints.dashboard import dashboard_bp
+        from blueprints.workspaces import workspaces_bp
+        from blueprints.git import git_bp
+        from blueprints.ide import ide_bp
+        from blueprints.files import files_bp
 
-    app.register_blueprint(dashboard_bp)
-    app.register_blueprint(workspaces_bp, url_prefix='/workspaces')
-    app.register_blueprint(git_bp, url_prefix='/git')
-    app.register_blueprint(ide_bp, url_prefix='/ide')
-    app.register_blueprint(files_bp, url_prefix='/files')
+        app.register_blueprint(dashboard_bp)
+        app.register_blueprint(workspaces_bp, url_prefix='/workspaces')
+        app.register_blueprint(git_bp, url_prefix='/git')
+        app.register_blueprint(ide_bp, url_prefix='/ide')
+        app.register_blueprint(files_bp, url_prefix='/files')
+    except Exception as e:
+        print(f"Error registering blueprints: {str(e)}")
+        # Continue without blueprints for debugging
 
     # Add debug route to list all routes
     @app.route('/debug/routes')
@@ -108,64 +116,19 @@ def create_app(config_name=None):
             })
         return jsonify({'routes': routes})
 
-    # Add database initialization route
-    @app.route('/debug/init-db')
-    def init_database():
-        try:
-            from models import Settings
-            from utils.encryption import generate_key
-
-            # Check if settings exist
-            settings = Settings.query.first()
-            if not settings:
-                settings = Settings()
-                settings.encryption_key = generate_key()
-                settings.gitlab_url = 'https://gitlab.rc.uab.edu/api/v4'
-                db.session.add(settings)
-                db.session.commit()
-                return jsonify({
-                    'success': True,
-                    'message': 'Database initialized with default settings',
-                    'gitlab_url': settings.gitlab_url
-                })
-            else:
-                return jsonify({
-                    'success': True,
-                    'message': 'Settings already exist',
-                    'gitlab_url': settings.gitlab_url,
-                    'has_token': bool(settings.gitlab_pat_encrypted)
-                })
-        except Exception as e:
-            return jsonify({
-                'success': False,
-                'message': f'Database initialization failed: {str(e)}'
-            }), 500
-
-    # Add API info endpoint
-    @app.route('/api/info')
-    def api_info():
-        return jsonify({
-            'status': 'running',
-            'version': '1.0.0',
-            'cors_origins': app.config['CORS_ORIGINS'],
-            'api_base_url': app.config['API_BASE_URL']
-        })
-
-    # Add health check endpoint
+    # Add simple health check
     @app.route('/health')
     def health_check():
         return jsonify({'status': 'healthy', 'timestamp': str(datetime.utcnow())})
 
-    # Add app status endpoint - use the dashboard blueprint's implementation
-    @app.route('/app-status')
-    def app_status():
-        try:
-            from services.analytics_service import get_app_status
-            status = get_app_status()
-            return jsonify(status)
-        except Exception as e:
-            app.logger.error(f"Error getting app status: {str(e)}")
-            return jsonify({'error': True, 'message': str(e)}), 500
+    # Add basic status endpoint
+    @app.route('/status')
+    def basic_status():
+        return jsonify({
+            'app': 'UBRITE Workspace Manager',
+            'status': 'running',
+            'timestamp': str(datetime.utcnow())
+        })
 
     # Error handlers with CORS support
     @app.errorhandler(404)
@@ -196,31 +159,29 @@ def create_app(config_name=None):
     with app.app_context():
         try:
             # Ensure directories exist first
-            from utils.filesystem import ensure_directories
             ensure_directories(log_initialization=True)
 
             # Create the database tables
             db.create_all()
 
-            # Run database migrations
-            from utils.db_migrations import run_migrations
-            run_migrations()
-
-            # Initialize default settings
-            from models import Settings
-            from utils.encryption import generate_key
-            settings = Settings.query.first()
-            if not settings:
-                settings = Settings()
-                settings.encryption_key = generate_key()
-                settings.gitlab_url = 'https://gitlab.rc.uab.edu/api/v4'
-                db.session.add(settings)
-                db.session.commit()
-                app.logger.info(f"Created default settings with GitLab URL: {settings.gitlab_url}")
+            # Initialize default settings safely
+            try:
+                from models import Settings
+                from utils.encryption import generate_key
+                settings = Settings.query.first()
+                if not settings:
+                    settings = Settings()
+                    settings.encryption_key = generate_key()
+                    settings.gitlab_url = 'https://gitlab.rc.uab.edu/api/v4'
+                    db.session.add(settings)
+                    db.session.commit()
+                    app.logger.info(f"Created default settings with GitLab URL: {settings.gitlab_url}")
+            except Exception as e:
+                app.logger.warning(f"Could not initialize default settings: {str(e)}")
 
         except Exception as e:
-            app.logger.error(f"Error during app initialization: {str(e)}")
-        # Don't fail completely, just log the error
+            print(f"Error during app initialization: {str(e)}")
+            # Don't fail completely, just log the error
 
     return app
 
