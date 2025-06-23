@@ -25,8 +25,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Get the correct base URL for API calls
-  function getApiBaseUrl() {
+  // Get the correct base URL for INTERNAL API calls (to our Flask app)
+  function getInternalApiBaseUrl() {
     // For OnDemand, the base URL should be the current path
     const currentPath = window.location.pathname
     if (currentPath.includes("/pun/dev/")) {
@@ -42,10 +42,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Global GitLab token expiration checker
   function checkGitLabTokenExpiration() {
-    const baseUrl = getApiBaseUrl()
+    // Use INTERNAL API to check GitLab status (this calls our Flask app, not GitLab directly)
+    const baseUrl = getInternalApiBaseUrl()
     const apiUrl = `${baseUrl}/gitlab-status`
 
-    console.log("Checking GitLab status at:", apiUrl)
+    console.log("Checking GitLab status via internal API at:", apiUrl)
 
     fetch(apiUrl, {
       method: "GET",
@@ -133,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Make global functions available
   window.showGlobalAlert = showGlobalAlert
   window.checkGitLabTokenExpiration = checkGitLabTokenExpiration
-  window.getApiBaseUrl = getApiBaseUrl
+  window.getInternalApiBaseUrl = getInternalApiBaseUrl
 
   // Analytics tracking
   function trackEvent(eventName, payload) {

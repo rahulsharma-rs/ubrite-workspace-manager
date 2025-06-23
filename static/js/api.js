@@ -1,12 +1,12 @@
 // API Client for UBRITE Workspace Manager
 class UBRITEAPIClient {
   constructor() {
-    this.baseURL = this.getBaseURL()
+    this.baseURL = this.getInternalBaseURL()
     this.timeout = 30000 // 30 seconds
   }
 
-  getBaseURL() {
-    // For OnDemand deployment, use the current path structure
+  getInternalBaseURL() {
+    // For OnDemand deployment, use the current path structure for INTERNAL API calls
     const currentPath = window.location.pathname
     if (currentPath.includes("/pun/dev/")) {
       // Extract the base path for OnDemand
@@ -38,7 +38,7 @@ class UBRITEAPIClient {
       config.headers["X-CSRFToken"] = csrfToken
     }
 
-    console.log(`API Request: ${config.method || "GET"} ${url}`)
+    console.log(`Internal API Request: ${config.method || "GET"} ${url}`)
 
     try {
       const controller = new AbortController()
@@ -51,7 +51,7 @@ class UBRITEAPIClient {
 
       clearTimeout(timeoutId)
 
-      console.log(`API Response: ${response.status} ${response.statusText}`)
+      console.log(`Internal API Response: ${response.status} ${response.statusText}`)
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -68,7 +68,7 @@ class UBRITEAPIClient {
       if (error.name === "AbortError") {
         throw new Error("Request timeout")
       }
-      console.error(`API Error for ${url}:`, error)
+      console.error(`Internal API Error for ${url}:`, error)
       throw error
     }
   }
@@ -103,7 +103,7 @@ class UBRITEAPIClient {
       }),
   }
 
-  // Settings API
+  // Settings API - These call our Flask app, which then calls GitLab
   settings = {
     get: () => this.request("/settings"),
 

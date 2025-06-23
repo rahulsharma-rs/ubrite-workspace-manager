@@ -11,6 +11,10 @@ from extensions import db
 class GitLabService:
     """Service for interacting with GitLab API."""
 
+    # GitLab instance configuration - EXTERNAL URLs
+    GITLAB_BASE_URL = 'https://gitlab.rc.uab.edu'
+    GITLAB_API_URL = 'https://gitlab.rc.uab.edu/api/v4'
+
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self._api_url = None
@@ -30,23 +34,27 @@ class GitLabService:
 
     @property
     def api_url(self):
+        """Get GitLab API URL - always use the external GitLab instance."""
         if self._api_url is None:
             settings = Settings.query.first()
             if settings and hasattr(settings, 'gitlab_url') and settings.gitlab_url:
                 self._api_url = settings.gitlab_url
             else:
-                self._api_url = current_app.config.get('GITLAB_API_URL', 'https://gitlab.com/api/v4')
+                # Default to UAB GitLab instance
+                self._api_url = self.GITLAB_API_URL
         return self._api_url
 
     @property
     def gitlab_url(self):
-        """Get GitLab URL from settings."""
+        """Get GitLab base URL from settings."""
         if self._gitlab_url is None:
             settings = Settings.query.first()
             if settings and hasattr(settings, 'gitlab_url') and settings.gitlab_url:
-                self._gitlab_url = settings.gitlab_url
+                # Remove /api/v4 to get base URL
+                self._gitlab_url = settings.gitlab_url.replace('/api/v4', '')
             else:
-                self._gitlab_url = None
+                # Default to UAB GitLab instance
+                self._gitlab_url = self.GITLAB_BASE_URL
         return self._gitlab_url
 
     @property
@@ -63,12 +71,6 @@ class GitLabService:
             else:
                 self._token = None
         return self._token
-
-    @property
-    def headers(self):
-        if self._headers is None:
-            self._headers = self._get_headers()
-        return self._headers
 
     @property
     def headers(self):
@@ -101,30 +103,34 @@ class GitLabService:
         """
         Validate a GitLab Personal Access Token and return detailed information.
 
+        Args:
+            token: The GitLab personal access token
+            api_url: Optional API URL (deprecated, use gitlab_url)
+            gitlab_url: The GitLab base URL (e.g., https://gitlab.rc.uab.edu)
+
         Returns:
-            dict: {
-                'valid': bool,
-                'user_info': dict or None,
-                'token_info': dict or None,
-                'scopes': list,
-                'expires_at': str or None,
-                'message': str,
-                'error_code': str or None
-            }
+            dict: Validation result with user info, scopes, expiration, etc.
         """
         try:
-            # Use provided URL or fall back to configured URL
-            url = gitlab_url or self.gitlab_url or api_url or self.api_url
-            if not url:
-                return {
-                    'valid': False,
-                    'message': 'GitLab URL not configured',
-                    'error_code': 'NO_URL'
-                }
+            # Determine the GitLab URL to use
+            if gitlab_url:
+                # Use provided GitLab URL
+                base_url = gitlab_url.rstrip('/')
+                if not base_url.endswith('/api/v4'):
+                    api_endpoint = f"{base_url}/api/v4"
+                else:
+                    api_endpoint = base_url
+                    base_url = base_url.replace('/api/v4', '')
+            elif api_url:
+                # Legacy support
+                api_endpoint = api_url
+                base_url = api_url.replace('/api/v4', '')
+            else:
+                # Use configured URL or default
+                api_endpoint = self.api_url
+                base_url = self.gitlab_url
 
-            # Ensure URL format
-            if not url.endswith('/api/v4'):
-                url = url.rstrip('/') + '/api/v4'
+            self.logger.info(f"Validating GitLab token against: {api_endpoint}")
 
             # Test token by getting user info
             headers = {
@@ -132,7 +138,7 @@ class GitLabService:
                 'Content-Type': 'application/json'
             }
 
-            response = requests.get(f'{url}/user', headers=headers, timeout=10)
+            response = requests.get(f'{api_endpoint}/user', headers=headers, timeout=10)
 
             if response.status_code == 200:
                 user_data = response.json()
@@ -140,7 +146,8 @@ class GitLabService:
                 # Get token info for additional details
                 token_info = {}
                 try:
-                    token_response = requests.get(f'{url}/personal_access_tokens/self', headers=headers, timeout=10)
+                    token_response = requests.get(f'{api_endpoint}/personal_access_tokens/self', headers=headers,
+                                                  timeout=10)
                     if token_response.status_code == 200:
                         token_info = token_response.json()
                 except:
@@ -152,17 +159,21 @@ class GitLabService:
                     analytics.track_event('gitlab_token_validated', {
                         'user_id': user_data.get('id'),
                         'username': user_data.get('username'),
+                        'gitlab_url': base_url,
                         'scopes': token_info.get('scopes', [])
                     })
 
                 return {
                     'valid': True,
-                    'message': 'Token is valid',
+                    'message': f'Token is valid for {base_url}',
+                    'gitlab_url': base_url,
+                    'api_url': api_endpoint,
                     'user_info': {
                         'id': user_data.get('id'),
                         'username': user_data.get('username'),
                         'name': user_data.get('name'),
-                        'email': user_data.get('email')
+                        'email': user_data.get('email'),
+                        'web_url': user_data.get('web_url')
                     },
                     'scopes': token_info.get('scopes', []),
                     'expires_at': token_info.get('expires_at'),
@@ -172,33 +183,38 @@ class GitLabService:
                 return {
                     'valid': False,
                     'message': 'Invalid token or insufficient permissions',
-                    'error_code': 'INVALID_TOKEN'
+                    'error_code': 'INVALID_TOKEN',
+                    'gitlab_url': base_url
                 }
             else:
                 return {
                     'valid': False,
                     'message': f'GitLab API error: {response.status_code}',
-                    'error_code': 'API_ERROR'
+                    'error_code': 'API_ERROR',
+                    'gitlab_url': base_url
                 }
 
         except requests.exceptions.Timeout:
             return {
                 'valid': False,
                 'message': 'Request timed out - check GitLab URL',
-                'error_code': 'TIMEOUT'
+                'error_code': 'TIMEOUT',
+                'gitlab_url': gitlab_url or base_url if 'base_url' in locals() else 'unknown'
             }
         except requests.exceptions.ConnectionError:
             return {
                 'valid': False,
                 'message': 'Cannot connect to GitLab - check URL and network',
-                'error_code': 'CONNECTION_ERROR'
+                'error_code': 'CONNECTION_ERROR',
+                'gitlab_url': gitlab_url or base_url if 'base_url' in locals() else 'unknown'
             }
         except Exception as e:
             self.logger.error(f"Error validating GitLab token: {str(e)}")
             return {
                 'valid': False,
                 'message': f'Validation error: {str(e)}',
-                'error_code': 'VALIDATION_ERROR'
+                'error_code': 'VALIDATION_ERROR',
+                'gitlab_url': gitlab_url or 'unknown'
             }
 
     def check_token_status(self):
@@ -226,7 +242,7 @@ class GitLabService:
                 }
 
             # Validate current token
-            validation_result = self.validate_token(self.token, self.gitlab_url)
+            validation_result = self.validate_token(self.token, gitlab_url=self.gitlab_url)
 
             if validation_result['valid']:
                 # Check expiration
@@ -244,7 +260,8 @@ class GitLabService:
                                 'message': 'Token has expired',
                                 'error_code': 'TOKEN_EXPIRED',
                                 'expires_at': expires_at,
-                                'days_until_expiry': days_until_expiry
+                                'days_until_expiry': days_until_expiry,
+                                'gitlab_url': self.gitlab_url
                             }
                         elif days_until_expiry <= 7:
                             return {
@@ -255,7 +272,8 @@ class GitLabService:
                                 'expires_at': expires_at,
                                 'days_until_expiry': days_until_expiry,
                                 'user_info': validation_result.get('user_info'),
-                                'scopes': validation_result.get('scopes', [])
+                                'scopes': validation_result.get('scopes', []),
+                                'gitlab_url': self.gitlab_url
                             }
                     except Exception as e:
                         self.logger.warning(f"Error parsing expiry date: {str(e)}")
@@ -266,14 +284,16 @@ class GitLabService:
                     'message': 'Token is valid and active',
                     'expires_at': expires_at,
                     'user_info': validation_result.get('user_info'),
-                    'scopes': validation_result.get('scopes', [])
+                    'scopes': validation_result.get('scopes', []),
+                    'gitlab_url': self.gitlab_url
                 }
             else:
                 return {
                     'configured': True,
                     'valid': False,
                     'message': validation_result.get('message'),
-                    'error_code': validation_result.get('error_code')
+                    'error_code': validation_result.get('error_code'),
+                    'gitlab_url': self.gitlab_url
                 }
 
         except Exception as e:
@@ -282,7 +302,8 @@ class GitLabService:
                 'configured': True,
                 'valid': False,
                 'message': f'Status check failed: {str(e)}',
-                'error_code': 'STATUS_ERROR'
+                'error_code': 'STATUS_ERROR',
+                'gitlab_url': self.gitlab_url
             }
 
     def test_connection(self):
@@ -303,7 +324,8 @@ class GitLabService:
                 }
 
             # Test API connection
-            response = requests.get(f'{self.gitlab_url}/user', headers=self.headers, timeout=10)
+            self.logger.info(f"Testing GitLab connection to: {self.api_url}")
+            response = requests.get(f'{self.api_url}/user', headers=self.headers, timeout=10)
 
             if response.status_code == 200:
                 user_data = response.json()
@@ -313,45 +335,52 @@ class GitLabService:
                 if analytics:
                     analytics.track_event('gitlab_connection_tested', {
                         'success': True,
-                        'user_id': user_data.get('id')
+                        'user_id': user_data.get('id'),
+                        'gitlab_url': self.gitlab_url
                     })
 
                 return {
                     'success': True,
-                    'message': f'Connected as {user_data.get("name", "Unknown")} ({user_data.get("username", "unknown")})',
-                    'user_info': user_data
+                    'message': f'Connected to {self.gitlab_url} as {user_data.get("name", "Unknown")} ({user_data.get("username", "unknown")})',
+                    'user_info': user_data,
+                    'gitlab_url': self.gitlab_url,
+                    'api_url': self.api_url
                 }
             else:
                 return {
                     'success': False,
                     'message': f'GitLab API returned status {response.status_code}',
-                    'error_code': 'API_ERROR'
+                    'error_code': 'API_ERROR',
+                    'gitlab_url': self.gitlab_url
                 }
 
         except requests.exceptions.Timeout:
             return {
                 'success': False,
-                'message': 'Connection timed out',
-                'error_code': 'TIMEOUT'
+                'message': f'Connection timed out to {self.gitlab_url}',
+                'error_code': 'TIMEOUT',
+                'gitlab_url': self.gitlab_url
             }
         except requests.exceptions.ConnectionError:
             return {
                 'success': False,
-                'message': 'Cannot connect to GitLab',
-                'error_code': 'CONNECTION_ERROR'
+                'message': f'Cannot connect to GitLab at {self.gitlab_url}',
+                'error_code': 'CONNECTION_ERROR',
+                'gitlab_url': self.gitlab_url
             }
         except Exception as e:
             self.logger.error(f"Error testing GitLab connection: {str(e)}")
             return {
                 'success': False,
                 'message': f'Connection test failed: {str(e)}',
-                'error_code': 'TEST_ERROR'
+                'error_code': 'TEST_ERROR',
+                'gitlab_url': self.gitlab_url
             }
 
     def create_repository(self, name, visibility='private'):
         """Create a new GitLab repository."""
         try:
-            if not self.gitlab_url or not self.headers:
+            if not self.api_url or not self.headers:
                 self.logger.error("GitLab not configured")
                 return None
 
@@ -362,7 +391,7 @@ class GitLabService:
             }
 
             response = requests.post(
-                f'{self.gitlab_url}/projects',
+                f'{self.api_url}/projects',
                 headers=self.headers,
                 json=data,
                 timeout=30
@@ -377,7 +406,8 @@ class GitLabService:
                     analytics.track_event('gitlab_repo_created', {
                         'repo_id': repo_data.get('id'),
                         'repo_name': name,
-                        'visibility': visibility
+                        'visibility': visibility,
+                        'gitlab_url': self.gitlab_url
                     })
 
                 return repo_data
@@ -392,13 +422,13 @@ class GitLabService:
     def delete_repository(self, repo_id):
         """Delete a GitLab repository."""
         if not repo_id:
-            logging.warning("Cannot delete GitLab repository: No repo ID provided")
+            self.logger.warning("Cannot delete GitLab repository: No repo ID provided")
             return True
 
         # Check token status first
         token_status = self.check_token_status()
         if not token_status.get('valid', False):
-            logging.warning(f"Cannot delete repository: {token_status.get('message')}")
+            self.logger.warning(f"Cannot delete repository: {token_status.get('message')}")
             return True  # Return True to allow cleanup to continue
 
         try:
@@ -409,12 +439,12 @@ class GitLabService:
             )
             success = response.status_code in (200, 202, 204)
             if success:
-                logging.info(f"GitLab repository deleted successfully: {repo_id}")
+                self.logger.info(f"GitLab repository deleted successfully: {repo_id}")
             else:
-                logging.error(f"Failed to delete GitLab repository: {response.status_code} - {response.text}")
+                self.logger.error(f"Failed to delete GitLab repository: {response.status_code} - {response.text}")
             return success
         except Exception as e:
-            logging.error(f"Exception deleting GitLab repository: {str(e)}")
+            self.logger.error(f"Exception deleting GitLab repository: {str(e)}")
             return False
 
     def get_repository_info(self, repo_id):
@@ -429,10 +459,10 @@ class GitLabService:
             if response.status_code == 200:
                 return response.json()
             else:
-                logging.error(f"Failed to get GitLab repository info: {response.status_code} - {response.text}")
+                self.logger.error(f"Failed to get GitLab repository info: {response.status_code} - {response.text}")
                 return None
         except Exception as e:
-            logging.error(f"Exception getting GitLab repository info: {str(e)}")
+            self.logger.error(f"Exception getting GitLab repository info: {str(e)}")
             return None
 
     def get_repositories(self):
@@ -443,11 +473,11 @@ class GitLabService:
             list: List of repositories or empty list if failed
         """
         try:
-            if not self.gitlab_url or not self.headers:
+            if not self.api_url or not self.headers:
                 return []
 
             response = requests.get(
-                f'{self.gitlab_url}/projects',
+                f'{self.api_url}/projects',
                 headers=self.headers,
                 params={'owned': True, 'per_page': 100},
                 timeout=10
@@ -463,7 +493,28 @@ class GitLabService:
             self.logger.error(f"Error getting GitLab repositories: {str(e)}")
             return []
 
-    # Add these methods to maintain backward compatibility
+    def get_clone_url(self, repo_data, use_ssh=False):
+        """
+        Get the clone URL for a repository.
+
+        Args:
+            repo_data: Repository data from GitLab API
+            use_ssh: Whether to use SSH URL (default: False, uses HTTPS)
+
+        Returns:
+            str: Clone URL
+        """
+        if use_ssh:
+            return repo_data.get('ssh_url_to_repo')
+        else:
+            # For HTTPS with token, we'll modify the URL to include the token
+            https_url = repo_data.get('http_url_to_repo')
+            if https_url and self.token:
+                # Insert token into URL: https://oauth2:TOKEN@gitlab.rc.uab.edu/user/repo.git
+                https_url = https_url.replace('https://', f'https://oauth2:{self.token}@')
+            return https_url
+
+    # Backward compatibility methods
     def get_headers_legacy(self):
         """Legacy method for getting headers - maintained for backward compatibility."""
         return self.headers

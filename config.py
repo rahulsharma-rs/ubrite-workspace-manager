@@ -3,7 +3,7 @@ from datetime import timedelta
 
 # Get the current user from environment
 USER = os.environ.get('USER', 'default_user')
-BASE_PATH = f'/data/user/{USER}/ondemand/dev'
+BASE_PATH = f'/data/user/{USER}/ondemand'
 
 
 class Config:
@@ -46,8 +46,9 @@ class Config:
     # API settings
     API_BASE_URL = f'/pun/dev/rc_workspace'  # OnDemand path
 
-    # External service settings
+    # External service settings - GitLab is EXTERNAL, not through OnDemand
     GITLAB_URL = os.environ.get('GITLAB_URL', 'https://gitlab.rc.uab.edu')
+    GITLAB_API_URL = os.environ.get('GITLAB_API_URL', 'https://gitlab.rc.uab.edu/api/v4')
     GITLAB_TOKEN = os.environ.get('GITLAB_TOKEN', '')
 
     # Conda settings
