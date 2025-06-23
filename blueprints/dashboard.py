@@ -26,11 +26,10 @@ def get_settings():
     """Get current settings."""
     try:
         settings = Settings.query.first()
-        gitlab_service = GitLabService()
 
         response_data = {
             'has_gitlab_pat': False,
-            'gitlab_url': None,
+            'gitlab_url': 'https://gitlab.rc.uab.edu',  # Default GitLab URL
             'gitlab_status': None
         }
 
@@ -43,6 +42,7 @@ def get_settings():
 
             # Check token status if configured
             if settings.gitlab_pat_encrypted:
+                gitlab_service = GitLabService()
                 token_status = gitlab_service.check_token_status()
                 response_data['gitlab_status'] = token_status
 
@@ -58,7 +58,7 @@ def validate_gitlab_token():
     try:
         data = request.json
         token = data.get('token')
-        gitlab_url = data.get('gitlab_url')
+        gitlab_url = data.get('gitlab_url', 'https://gitlab.rc.uab.edu')
 
         if not token:
             return jsonify({
@@ -67,12 +67,19 @@ def validate_gitlab_token():
                 'error_code': 'MISSING_TOKEN'
             }), 400
 
-        # Ensure URL has correct format
-        if gitlab_url and not gitlab_url.endswith('/api/v4'):
-            gitlab_url = gitlab_url.rstrip('/') + '/api/v4'
+        # Ensure URL has correct format - always use external GitLab
+        if not gitlab_url.startswith('http'):
+            gitlab_url = 'https://gitlab.rc.uab.edu'
+
+        # Remove any trailing slashes and ensure it doesn't have /api/v4
+        gitlab_url = gitlab_url.rstrip('/')
+        if gitlab_url.endswith('/api/v4'):
+            gitlab_url = gitlab_url.replace('/api/v4', '')
+
+        logger.info(f"Validating GitLab token for URL: {gitlab_url}")
 
         gitlab_service = GitLabService()
-        validation_result = gitlab_service.validate_token(token, gitlab_url)
+        validation_result = gitlab_service.validate_token(token, gitlab_url=gitlab_url)
 
         return jsonify(validation_result)
 
@@ -98,6 +105,8 @@ def save_settings():
             if 'gitlab_pat' in data:
                 data['gitlab_token'] = data.pop('gitlab_pat')
 
+        logger.info(f"Saving settings: {list(data.keys())}")
+
         # Get or create settings record
         settings = Settings.query.first()
         if not settings:
@@ -106,14 +115,23 @@ def save_settings():
             db.session.add(settings)
 
         # Handle GitLab settings
-        gitlab_url = data.get('gitlab_url')
+        gitlab_url = data.get('gitlab_url', 'https://gitlab.rc.uab.edu')
         gitlab_token = data.get('gitlab_token') or data.get('gitlab_pat')  # Support both field names
 
-        if gitlab_url:
-            # Ensure URL has correct format
-            if not gitlab_url.endswith('/api/v4'):
-                gitlab_url = gitlab_url.rstrip('/') + '/api/v4'
-            settings.gitlab_url = gitlab_url
+        # Always ensure we have a proper GitLab URL
+        if not gitlab_url.startswith('http'):
+            gitlab_url = 'https://gitlab.rc.uab.edu'
+
+        # Clean up the URL
+        gitlab_url = gitlab_url.rstrip('/')
+        if gitlab_url.endswith('/api/v4'):
+            gitlab_url = gitlab_url.replace('/api/v4', '')
+
+        # Save the API URL format for internal use
+        api_url = f"{gitlab_url}/api/v4"
+        settings.gitlab_url = api_url
+
+        logger.info(f"Setting GitLab URL to: {api_url}")
 
         if gitlab_token:
             # For backward compatibility, if validation is not explicitly requested, just save
@@ -122,7 +140,7 @@ def save_settings():
             if validate_token:
                 # Validate token before saving
                 gitlab_service = GitLabService()
-                validation_result = gitlab_service.validate_token(gitlab_token, gitlab_url)
+                validation_result = gitlab_service.validate_token(gitlab_token, gitlab_url=gitlab_url)
 
                 if not validation_result.get('valid', False):
                     return jsonify({
@@ -140,9 +158,12 @@ def save_settings():
                 settings.encryption_key = generate_key()
             settings.gitlab_pat_encrypted = encrypt_data(gitlab_token, settings.encryption_key)
 
+            logger.info(f"GitLab token encrypted and saved")
+
             # Log the configuration
             log_event(None, 'gitlab_token_configured', {
                 'validated': validate_token,
+                'gitlab_url': gitlab_url,
                 'user': validation_result.get('user_info', {}).get('username') if validate_token else 'unknown'
             })
 
@@ -162,10 +183,12 @@ def save_settings():
                 json.dump({'jupyter_path': jupyter_path}, f)
 
         db.session.commit()
+        logger.info("Settings saved successfully to database")
 
         return jsonify({
             'success': True,
             'message': 'Settings saved successfully',
+            'gitlab_url': gitlab_url,
             'validation_result': validation_result if gitlab_token else None
         })
 
@@ -216,16 +239,17 @@ def debug_gitlab():
     """Debug GitLab configuration."""
     try:
         settings = Settings.query.first()
-        gitlab_service = GitLabService()
 
         debug_info = {
             'settings_exist': settings is not None,
             'gitlab_url': settings.gitlab_url if settings else None,
             'has_token': bool(settings and settings.gitlab_pat_encrypted),
-            'has_encryption_key': bool(settings and settings.encryption_key)
+            'has_encryption_key': bool(settings and settings.encryption_key),
+            'default_gitlab_url': 'https://gitlab.rc.uab.edu'
         }
 
         if settings and settings.gitlab_pat_encrypted:
+            gitlab_service = GitLabService()
             token_status = gitlab_service.check_token_status()
             debug_info['token_status'] = token_status
 
