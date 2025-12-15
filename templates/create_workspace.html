@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Workspace - UBRITE</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/modern.css') }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/">UBRITE</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/dashboard">Dashboard</a>
+                <a class="nav-link" href="/workspaces">Workspaces</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="mb-0">Create New Workspace</h4>
+                    </div>
+                    <div class="card-body">
+                        <form id="create-workspace-form">
+                            <div class="mb-3">
+                                <label for="workspace-name" class="form-label">Workspace Name</label>
+                                <input type="text" class="form-control" id="workspace-name" required>
+                                <div class="form-text">Choose a unique name for your workspace</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="env-type" class="form-label">Environment Template</label>
+                                <select class="form-select" id="env-type">
+                                    <option value="data-science">Data Science</option>
+                                    <option value="deep-learning">Deep Learning</option>
+                                    <option value="bioinformatics">Bioinformatics</option>
+                                    <option value="computer-vision">Computer Vision</option>
+                                    <option value="nlp">Natural Language Processing</option>
+                                    <option value="geospatial">Geospatial</option>
+                                    <option value="scientific-computing">Scientific Computing</option>
+                                    <option value="statistics">Statistics</option>
+                                    <option value="web-dev">Web Development</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="git-visibility" class="form-label">GitLab Repository Visibility</label>
+                                <select class="form-select" id="git-visibility">
+                                    <option value="private">Private</option>
+                                    <option value="internal">Internal</option>
+                                    <option value="public">Public</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="skip-conda">
+                                    <label class="form-check-label" for="skip-conda">
+                                        Skip Conda environment creation
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <a href="/workspaces" class="btn btn-secondary">Cancel</a>
+                                <button type="submit" class="btn btn-primary" id="create-btn">
+                                    <i class="bi bi-plus-circle"></i> Create Workspace
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Modal -->
+    <div class="modal fade" id="progress-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <h5>Creating Workspace...</h5>
+                    <p class="text-muted mb-0">This may take a few moments</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/create-workspace.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Test Cohort EDA Web Component</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2em;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1) Template definition -->
+  <template id="cohort-eda-template">
+    <style>
+      :host {
+        display: block;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .content {
+        padding: 1em;
+      }
+      .error {
+        color: red;
+      }
+    </style>
+    <div class="content">Loading cohort EDA…</div>
+  </template>
+
+  <!-- 2) The custom element script -->
+  <script>
+    class CohortEda extends HTMLElement {
+      constructor() {
+        super();
+        const tpl = document.getElementById('cohort-eda-template');
+        this._shadow = this.attachShadow({ mode: 'open' });
+        this._shadow.appendChild(tpl.content.cloneNode(true));
+      }
+
+      connectedCallback() {
+        const url = this.getAttribute('src');
+        if (!url) {
+          return this._showError('No `src` attribute provided.');
+        }
+        fetch(url, { credentials: 'include' })
+          .then(resp => {
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            return resp.text();
+          })
+          .then(html => this._inject(html))
+          .catch(err => this._showError(err.message));
+      }
+
+      _inject(html) {
+        const container = this._shadow.querySelector('.content');
+        container.innerHTML = html;
+
+        // Re‑execute any inline <script> tags
+        container.querySelectorAll('script').forEach(old => {
+          const nxt = document.createElement('script');
+          Array.from(old.attributes).forEach(a =>
+            nxt.setAttribute(a.name, a.value)
+          );
+          nxt.textContent = old.textContent;
+          old.replaceWith(nxt);
+        });
+      }
+
+      _showError(msg) {
+        const c = this._shadow.querySelector('.content');
+        c.innerHTML = `<div class="error">Error loading component: ${msg}</div>`;
+      }
+    }
+
+    customElements.define('cohort-eda', CohortEda);
+  </script>
+
+  <!-- 3) Usage -->
+  <h1>Embedded Cohort EDA</h1>
+  <cohort-eda src="https://rc.uab.edu/pun/sys/dashboard/batch_connect/sessions"></cohort-eda>
+
+</body>
+</html>

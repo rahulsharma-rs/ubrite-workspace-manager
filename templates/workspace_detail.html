@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ workspace.name }} - UBRITE Workspace</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modern.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <h1 class="logo">
+                        <i class="fas fa-cube"></i>
+                        UBRITE
+                    </h1>
+                    <nav class="nav">
+                        <a href="/" class="nav-link">Dashboard</a>
+                        <a href="/workspaces" class="nav-link">Workspaces</a>
+                        <a href="/workspaces/create" class="nav-link">Create</a>
+                    </nav>
+                </div>
+                <div class="header-right">
+                    <button class="btn-ghost">
+                        <i class="fas fa-cog"></i>
+                        Settings
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Workspace Header -->
+            <div class="workspace-header">
+                <div class="workspace-info">
+                    <h1 class="workspace-title">{{ workspace.name }}</h1>
+                    <div class="workspace-meta">
+                        <span class="badge badge-{{ workspace.status or 'inactive' }}">
+                            <i class="fas fa-circle"></i>
+                            {{ workspace.status or 'Inactive' }}
+                        </span>
+                        <span class="meta-item">
+                            <i class="fas fa-layer-group"></i>
+                            {{ workspace.environment_type or 'Unknown' }}
+                        </span>
+                        <span class="meta-item">
+                            <i class="fas fa-calendar"></i>
+                            Created {{ workspace.created_at.strftime('%Y-%m-%d') if workspace.created_at else 'Unknown' }}
+                        </span>
+                    </div>
+                </div>
+                <div class="workspace-actions">
+                    <button class="btn-primary" onclick="openJupyter({{ workspace.id }})">
+                        <i class="fas fa-play"></i>
+                        Launch Jupyter
+                    </button>
+                    <button class="btn-secondary" onclick="openFiles({{ workspace.id }})">
+                        <i class="fas fa-folder"></i>
+                        Browse Files
+                    </button>
+                    <button class="btn-secondary" onclick="openTerminal({{ workspace.id }})">
+                        <i class="fas fa-terminal"></i>
+                        Terminal
+                    </button>
+                </div>
+            </div>
+
+            <!-- Workspace Content Grid -->
+            <div class="workspace-grid">
+                <!-- Quick Stats -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-chart-bar"></i>
+                            Quick Stats
+                        </h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-value">0</div>
+                                <div class="stat-label">Files</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">0 MB</div>
+                                <div class="stat-label">Size</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">0</div>
+                                <div class="stat-label">Notebooks</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">0</div>
+                                <div class="stat-label">Scripts</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-history"></i>
+                            Recent Activity
+                        </h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="activity-list">
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="fas fa-plus text-success"></i>
+                                </div>
+                                <div class="activity-content">
+                                    <div class="activity-title">Workspace created</div>
+                                    <div class="activity-time">{{ workspace.created_at.strftime('%Y-%m-%d %H:%M') if workspace.created_at else 'Unknown' }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Environment Info -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-layer-group"></i>
+                            Environment
+                        </h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="env-info">
+                            <div class="env-item">
+                                <span class="env-label">Type:</span>
+                                <span class="env-value">{{ workspace.environment_type or 'Unknown' }}</span>
+                            </div>
+                            <div class="env-item">
+                                <span class="env-label">Python:</span>
+                                <span class="env-value">{{ workspace.python_version or 'Unknown' }}</span>
+                            </div>
+                            <div class="env-item">
+                                <span class="env-label">Status:</span>
+                                <span class="badge badge-{{ workspace.status or 'inactive' }}">
+                                    {{ workspace.status or 'Inactive' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Git Repository -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fab fa-git-alt"></i>
+                            Git Repository
+                        </h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="git-info">
+                            {% if workspace.git_url %}
+                                <div class="git-item">
+                                    <span class="git-label">Repository:</span>
+                                    <a href="{{ workspace.git_url }}" target="_blank" class="git-link">
+                                        {{ workspace.git_url }}
+                                    </a>
+                                </div>
+                                <div class="git-actions">
+                                    <button class="btn-secondary btn-sm">
+                                        <i class="fas fa-sync"></i>
+                                        Pull
+                                    </button>
+                                    <button class="btn-secondary btn-sm">
+                                        <i class="fas fa-upload"></i>
+                                        Push
+                                    </button>
+                                </div>
+                            {% else %}
+                                <div class="empty-state">
+                                    <i class="fab fa-git-alt"></i>
+                                    <p>No Git repository configured</p>
+                                    <button class="btn-primary btn-sm">
+                                        <i class="fas fa-plus"></i>
+                                        Initialize Git
+                                    </button>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function openJupyter(workspaceId) {
+            // Launch Jupyter for this workspace
+            fetch(`/api/ide/launch-jupyter/${workspaceId}`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.open(data.url, '_blank');
+                } else {
+                    alert('Failed to launch Jupyter: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to launch Jupyter');
+            });
+        }
+
+        function openFiles(workspaceId) {
+            window.location.href = `/workspaces/${workspaceId}/files`;
+        }
+
+        function openTerminal(workspaceId) {
+            // Open terminal for this workspace
+            alert('Terminal functionality coming soon!');
+        }
+    </script>
+</body>
+</html>

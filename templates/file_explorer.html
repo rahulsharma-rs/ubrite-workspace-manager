@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Files - {{ workspace.name }} - UBRITE</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modern.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <h1 class="logo">
+                        <i class="fas fa-cube"></i>
+                        UBRITE
+                    </h1>
+                    <nav class="nav">
+                        <a href="/" class="nav-link">Dashboard</a>
+                        <a href="/workspaces" class="nav-link">Workspaces</a>
+                        <a href="/workspaces/{{ workspace.id }}" class="nav-link">{{ workspace.name }}</a>
+                    </nav>
+                </div>
+                <div class="header-right">
+                    <button class="btn-ghost">
+                        <i class="fas fa-cog"></i>
+                        Settings
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- File Explorer Header -->
+            <div class="file-explorer-header">
+                <div class="breadcrumb">
+                    <span class="breadcrumb-item">
+                        <i class="fas fa-home"></i>
+                        {{ workspace.name }}
+                    </span>
+                    <span class="breadcrumb-separator">/</span>
+                    <span class="breadcrumb-item current-path">root</span>
+                </div>
+                <div class="file-actions">
+                    <button class="btn-primary" onclick="uploadFile()">
+                        <i class="fas fa-upload"></i>
+                        Upload
+                    </button>
+                    <button class="btn-secondary" onclick="createFolder()">
+                        <i class="fas fa-folder-plus"></i>
+                        New Folder
+                    </button>
+                    <button class="btn-secondary" onclick="createFile()">
+                        <i class="fas fa-file-plus"></i>
+                        New File
+                    </button>
+                </div>
+            </div>
+
+            <!-- File Explorer Content -->
+            <div class="file-explorer">
+                <div class="file-explorer-sidebar">
+                    <div class="sidebar-section">
+                        <h4 class="sidebar-title">Quick Access</h4>
+                        <div class="sidebar-items">
+                            <div class="sidebar-item active">
+                                <i class="fas fa-folder"></i>
+                                <span>All Files</span>
+                            </div>
+                            <div class="sidebar-item">
+                                <i class="fas fa-book"></i>
+                                <span>Notebooks</span>
+                            </div>
+                            <div class="sidebar-item">
+                                <i class="fas fa-file-code"></i>
+                                <span>Scripts</span>
+                            </div>
+                            <div class="sidebar-item">
+                                <i class="fas fa-database"></i>
+                                <span>Data</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="file-explorer-main">
+                    <div class="file-list-header">
+                        <div class="view-controls">
+                            <button class="view-btn active" data-view="list">
+                                <i class="fas fa-list"></i>
+                            </button>
+                            <button class="view-btn" data-view="grid">
+                                <i class="fas fa-th"></i>
+                            </button>
+                        </div>
+                        <div class="sort-controls">
+                            <select class="sort-select">
+                                <option value="name">Sort by Name</option>
+                                <option value="date">Sort by Date</option>
+                                <option value="size">Sort by Size</option>
+                                <option value="type">Sort by Type</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="file-list" id="fileList">
+                        <!-- Files will be loaded here -->
+                        <div class="loading-state">
+                            <div class="spinner"></div>
+                            <p>Loading files...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="modal" id="uploadModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Upload Files</h3>
+                <button class="modal-close" onclick="closeModal('uploadModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-area" id="uploadArea">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>Drag and drop files here or click to browse</p>
+                    <input type="file" id="fileInput" multiple hidden>
+                    <button class="btn-primary" onclick="document.getElementById('fileInput').click()">
+                        Choose Files
+                    </button>
+                </div>
+                <div class="upload-progress" id="uploadProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <p class="progress-text">Uploading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/file-explorer.js') }}"></script>
+</body>
+</html>
