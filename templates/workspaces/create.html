@@ -5,76 +5,80 @@
 {% block header %}Create Workspace{% endblock %}
 
 {% block header_buttons %}
-<a href="{{ url_for('workspaces.list_workspaces') }}" class="btn btn-sm btn-outline-secondary">
-    <span data-feather="arrow-left"></span>
+<a href="{{ url_for('workspaces.list_workspaces') }}" class="btn btn-secondary">
+    <span data-feather="arrow-left" style="width: 16px; height: 16px;"></span>
     Back to Workspaces
 </a>
 {% endblock %}
 
 {% block content %}
-<div class="card">
-    <div class="card-body">
-        <div id="conda-status" class="mb-3"></div>
-        
-        <form id="create-workspace-form">
-            <div class="mb-3">
-                <label for="workspace-name" class="form-label">Workspace Name</label>
-                <input type="text" class="form-control" id="workspace-name" name="name" required>
-                <div class="form-text">
-                    This will be used for the directory name and GitLab repository.
+<!-- Modern form styling with better spacing and visual hierarchy -->
+<div style="max-width: 720px;">
+    <div class="card">
+        <div class="card-body">
+            <div id="conda-status" class="mb-3"></div>
+
+            <form id="create-workspace-form">
+                <div class="mb-3">
+                    <label for="workspace-name" class="form-label">Workspace Name</label>
+                    <input type="text" class="form-control" id="workspace-name" name="name" required placeholder="my-research-project">
+                    <div class="form-text">
+                        Used for the directory name and GitLab repository. Use lowercase letters, numbers, and hyphens.
+                    </div>
                 </div>
-            </div>
-            
-            <div class="mb-3">
-                <label for="env-type" class="form-label">Environment Type</label>
-                <select class="form-select" id="env-type" name="env_type">
-                    <option value="custom">Custom (Python 3.9)</option>
-                    <!-- Templates will be loaded dynamically -->
-                </select>
-                <div class="form-text">
-                    Select an environment template for your research domain.
+
+                <div class="mb-3">
+                    <label for="env-type" class="form-label">Environment Type</label>
+                    <select class="form-select" id="env-type" name="env_type">
+                        <option value="custom">Custom (Python 3.9)</option>
+                        <!-- Templates will be loaded dynamically -->
+                    </select>
+                    <div class="form-text">
+                        Select an environment template for your research domain.
+                    </div>
                 </div>
-            </div>
-            
-            <div class="mb-3">
-                <label for="python-env" class="form-label">Use Existing Python Environment</label>
-                <select class="form-select" id="python-env" name="python_env">
-                    <option value="">Create new environment (default)</option>
-                    <!-- Environments will be loaded dynamically -->
-                </select>
-                <div class="form-text">
-                    Optionally select an existing Python environment to use instead of creating a new one.
+
+                <div class="mb-3">
+                    <label for="python-env" class="form-label">Use Existing Python Environment</label>
+                    <select class="form-select" id="python-env" name="python_env">
+                        <option value="">Create new environment (default)</option>
+                        <!-- Environments will be loaded dynamically -->
+                    </select>
+                    <div class="form-text">
+                        Optionally select an existing Python environment to use instead of creating a new one.
+                    </div>
                 </div>
-            </div>
-            
-            <div class="mb-3">
-                <label for="git-visibility" class="form-label">GitLab Repository Visibility</label>
-                <select class="form-select" id="git-visibility" name="git_visibility">
-                    <option value="private">Private</option>
-                    <option value="internal">Internal</option>
-                    <option value="public">Public</option>
-                </select>
-            </div>
-            
-            <div class="mb-3 form-check" id="skip-conda-container" style="display: none;">
-                <input type="checkbox" class="form-check-input" id="skip-conda" name="skip_conda">
-                <label class="form-check-label" for="skip-conda">Skip Conda environment creation</label>
-                <div class="form-text">
-                    Check this if you want to create the workspace without a Conda environment.
+
+                <div class="mb-3">
+                    <label for="git-visibility" class="form-label">GitLab Repository Visibility</label>
+                    <select class="form-select" id="git-visibility" name="git_visibility">
+                        <option value="private">Private</option>
+                        <option value="internal">Internal</option>
+                        <option value="public">Public</option>
+                    </select>
                 </div>
-            </div>
-            
-            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                <a href="{{ url_for('workspaces.list_workspaces') }}" class="btn btn-outline-secondary">
-                    Cancel
-                </a>
-                <button type="submit" class="btn btn-primary" id="create-button">
-                    Create Workspace
-                </button>
-            </div>
-        </form>
-        
-        <div id="create-status" class="mt-3"></div>
+
+                <div class="mb-3 form-check" id="skip-conda-container" style="display: none;">
+                    <input type="checkbox" class="form-check-input" id="skip-conda" name="skip_conda">
+                    <label class="form-check-label" for="skip-conda" style="font-weight: 500;">Skip Conda environment creation</label>
+                    <div class="form-text">
+                        Check this if you want to create the workspace without a Conda environment.
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--color-border-default);">
+                    <a href="{{ url_for('workspaces.list_workspaces') }}" class="btn btn-secondary">
+                        Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary" id="create-button">
+                        <span data-feather="plus" style="width: 16px; height: 16px;"></span>
+                        Create Workspace
+                    </button>
+                </div>
+            </form>
+
+            <div id="create-status" class="mt-3"></div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -310,7 +314,27 @@
                     }, 1500);
                 } else {
                     let errorMessage = data.message;
-                    let errorDetails = data.details ? `<div class="mt-2 small">${data.details}</div>` : '';
+                    const escapeHtml = (unsafe) => {
+                        return String(unsafe)
+                            .replace(/&/g, "&amp;")
+                            .replace(/</g, "&lt;")
+                            .replace(/>/g, "&gt;")
+                            .replace(/"/g, "&quot;")
+                            .replace(/'/g, "&#039;");
+                    };
+
+                    let errorDetails = '';
+                    if (data.details) {
+                        const detailsText = (typeof data.details === 'string')
+                            ? data.details
+                            : JSON.stringify(data.details, null, 2);
+                        errorDetails = `
+                            <div class="mt-2">
+                                <div class="small text-muted mb-1">Details</div>
+                                <pre class="mb-0 small"><code>${escapeHtml(detailsText)}</code></pre>
+                            </div>
+                        `;
+                    }
                     
                     statusDiv.innerHTML = `
                         <div class="alert alert-danger">
@@ -318,6 +342,14 @@
                             ${errorDetails}
                         </div>
                     `;
+
+                    if (data.hint) {
+                        statusDiv.innerHTML += `
+                            <div class="alert alert-info">
+                                <strong>Hint:</strong> ${escapeHtml(data.hint)}
+                            </div>
+                        `;
+                    }
                     
                     // If it's a GitLab error, add a link to check GitLab settings
                     if (errorMessage.includes('GitLab')) {

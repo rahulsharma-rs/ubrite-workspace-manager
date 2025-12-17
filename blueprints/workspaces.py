@@ -47,6 +47,15 @@ def create_workspace():
         existing = Workspace.query.filter_by(name=name).first()
         if existing:
             return jsonify({'success': False, 'message': 'Workspace with this name already exists'}), 400
+
+        # GitLab configuration is required for repository creation.
+        # Fail fast with a clear 4xx error instead of raising later.
+        gitlab_service = GitLabService()
+        if 'PRIVATE-TOKEN' not in gitlab_service.headers:
+            return jsonify({
+                'success': False,
+                'message': 'GitLab Personal Access Token is not configured. Configure it in Dashboard → GitLab Configuration, then retry.'
+            }), 400
         
         start_time = time.time()
         
@@ -54,12 +63,33 @@ def create_workspace():
         workspace_path, db_path = create_workspace_directories(name)
         
         # Create GitLab repository
-        gitlab_service = GitLabService()
         repo = gitlab_service.create_repository(name, visibility=git_visibility)
         
         if not repo:
             # Clean up directories if GitLab repo creation fails
             delete_workspace_directories(workspace_path, db_path)
+
+            # If we have a concrete GitLab API error, surface it to the UI.
+            if gitlab_service.last_error:
+                err = gitlab_service.last_error
+                hint = None
+                try:
+                    message = err.get('error', {}).get('message', {})
+                    if isinstance(message, dict) and message.get('namespace') == ["is not valid"]:
+                        hint = (
+                            "GitLab rejected the target namespace. This is usually caused by either: "
+                            "(1) using a Group/Project Access Token instead of a Personal Access Token, or "
+                            "(2) needing to set a valid Group/Namespace ID in Dashboard → GitLab Configuration → "
+                            "GitLab Namespace ID."
+                        )
+                except Exception:
+                    hint = None
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to create GitLab repository.',
+                    'details': err
+                    , 'hint': hint
+                }), 400
             
             # Test GitLab connection to get more details
             connection_status = gitlab_service.test_connection()

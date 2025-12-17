@@ -35,6 +35,18 @@ def run_migrations():
             conn.commit()
     except Exception as e:
         print(f"Error in migration 1: {str(e)}")
+
+    # Migration 2: Add gitlab_namespace_id column to settings table if it doesn't exist
+    try:
+        cursor.execute("PRAGMA table_info(settings)")
+        columns = [column[1] for column in cursor.fetchall()]
+
+        if 'gitlab_namespace_id' not in columns:
+            print("Adding gitlab_namespace_id column to settings table")
+            cursor.execute("ALTER TABLE settings ADD COLUMN gitlab_namespace_id INTEGER")
+            conn.commit()
+    except Exception as e:
+        print(f"Error in migration 2: {str(e)}")
     
     # Close the connection
     conn.close()

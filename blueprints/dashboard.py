@@ -65,6 +65,14 @@ def settings():
         # Otherwise, handle form data (for GitLab settings)
         gitlab_pat = request.form.get('gitlab_pat')
         gitlab_url = request.form.get('gitlab_url')
+        gitlab_namespace_id_raw = request.form.get('gitlab_namespace_id')
+
+        gitlab_namespace_id = None
+        if gitlab_namespace_id_raw:
+            try:
+                gitlab_namespace_id = int(gitlab_namespace_id_raw)
+            except ValueError:
+                return jsonify({'success': False, 'message': 'GitLab Namespace ID must be a number'}), 400
         
         # Use default GitLab URL if not provided
         if not gitlab_url:
@@ -95,6 +103,7 @@ def settings():
                     settings = Settings(
                         gitlab_pat_encrypted=encrypted_pat,
                         gitlab_url=gitlab_url,
+                        gitlab_namespace_id=gitlab_namespace_id,
                         encryption_key=key
                     )
                     db.session.add(settings)
@@ -113,6 +122,10 @@ def settings():
                 except:
                     # If gitlab_url column doesn't exist yet, ignore
                     pass
+                try:
+                    settings.gitlab_namespace_id = gitlab_namespace_id
+                except Exception:
+                    pass
         else:
             # Just update the GitLab URL if PAT is not provided
             settings = Settings.query.first()
@@ -122,9 +135,13 @@ def settings():
                 except:
                     # If gitlab_url column doesn't exist yet, ignore
                     pass
+                try:
+                    settings.gitlab_namespace_id = gitlab_namespace_id
+                except Exception:
+                    pass
             else:
                 try:
-                    settings = Settings(gitlab_url=gitlab_url)
+                    settings = Settings(gitlab_url=gitlab_url, gitlab_namespace_id=gitlab_namespace_id)
                     db.session.add(settings)
                 except sqlalchemy.exc.OperationalError:
                     # If gitlab_url column doesn't exist yet
@@ -141,16 +158,22 @@ def settings():
     
     # Try to get gitlab_url, but handle the case where the column might not exist yet
     gitlab_url = None
+    gitlab_namespace_id = None
     if settings:
         try:
             gitlab_url = settings.gitlab_url
         except:
             # If gitlab_url column doesn't exist yet, ignore
             pass
+        try:
+            gitlab_namespace_id = settings.gitlab_namespace_id
+        except Exception:
+            pass
     
     return jsonify({
         'has_gitlab_pat': has_gitlab_pat,
-        'gitlab_url': gitlab_url
+        'gitlab_url': gitlab_url,
+        'gitlab_namespace_id': gitlab_namespace_id
     })
 
 @dashboard_bp.route('/env-templates')

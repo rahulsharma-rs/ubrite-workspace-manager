@@ -7,6 +7,7 @@ class Settings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     gitlab_pat_encrypted = db.Column(db.LargeBinary)
     gitlab_url = db.Column(db.String(255))
+    gitlab_namespace_id = db.Column(db.Integer)
     encryption_key = db.Column(db.LargeBinary)
     last_updated = db.Column(db.DateTime, default=datetime.utcnow)
 

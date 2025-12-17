@@ -10,6 +10,7 @@ class GitLabService:
     def __init__(self):
         self._api_url = None
         self._headers = None
+        self._last_error = None
     
     @property
     def api_url(self):
@@ -34,6 +35,11 @@ class GitLabService:
         if self._headers is None:
             self._headers = self._get_headers()
         return self._headers
+
+    @property
+    def last_error(self):
+        """Most recent GitLab API error payload (best-effort)."""
+        return self._last_error
     
     def _get_headers(self):
         """Get the headers for GitLab API requests."""
@@ -68,11 +74,23 @@ class GitLabService:
     
     def create_repository(self, name, visibility='private'):
         """Create a new GitLab repository."""
+        self._last_error = None
+
+        # Optionally target a specific namespace/group if configured.
+        namespace_id = None
+        settings = Settings.query.first()
+        if settings:
+            namespace_id = getattr(settings, "gitlab_namespace_id", None)
+
         data = {
             'name': name,
+            'path': self._slugify_project_path(name),
             'visibility': visibility,
             'initialize_with_readme': True
         }
+
+        if namespace_id:
+            data['namespace_id'] = namespace_id
         
         # Check if headers contain a token
         if 'PRIVATE-TOKEN' not in self.headers:
@@ -91,11 +109,49 @@ class GitLabService:
                 logging.info(f"GitLab repository created successfully: {name}")
                 return response.json()
             else:
+                error_payload = None
+                try:
+                    error_payload = response.json()
+                except Exception:
+                    error_payload = {'raw': response.text}
+
+                self._last_error = {
+                    'status_code': response.status_code,
+                    'error': error_payload,
+                    'request': {
+                        'name': name,
+                        'visibility': visibility,
+                        'namespace_id': namespace_id
+                    }
+                }
+
                 logging.error(f"Failed to create GitLab repository: {response.status_code} - {response.text}")
                 return None
         except Exception as e:
             logging.error(f"Exception creating GitLab repository: {str(e)}")
+            self._last_error = {
+                'status_code': None,
+                'error': str(e),
+                'request': {
+                    'name': name,
+                    'visibility': visibility,
+                    'namespace_id': namespace_id
+                }
+            }
             return None
+
+    @staticmethod
+    def _slugify_project_path(name: str) -> str:
+        """
+        GitLab project 'path' must be URL-friendly.
+        Keep it simple and deterministic to avoid 400s for names with spaces/case.
+        """
+        if not name:
+            return "workspace"
+        slug = name.strip().lower().replace(" ", "-")
+        slug = "".join(ch for ch in slug if ch.isalnum() or ch in "-_")
+        slug = slug.strip("-_")
+        return slug or "workspace"
     
     def delete_repository(self, repo_id):
         """Delete a GitLab repository."""

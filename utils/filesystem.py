@@ -79,18 +79,33 @@ def create_workspace_directories(workspace_name):
     return workspace_path, db_path
 
 
-def delete_workspace_directories(workspace):
-    """Delete the directory structure for a workspace."""
-    try:
-        if os.path.exists(workspace.path):
-            shutil.rmtree(workspace.path)
+def delete_workspace_directories(workspace, db_path=None):
+    """Delete the directory structure for a workspace.
 
-        if os.path.exists(workspace.db_path):
-            os.remove(workspace.db_path)
+    Accepts either a `Workspace` model instance or `(workspace_path, db_path)` strings.
+    """
+    if db_path is not None:
+        workspace_path = workspace
+        workspace_id = None
+    else:
+        workspace_path = getattr(workspace, "path", None)
+        db_path = getattr(workspace, "db_path", None)
+        workspace_id = getattr(workspace, "id", None)
+
+    if not workspace_path or not db_path:
+        raise ValueError("delete_workspace_directories requires workspace_path and db_path")
+
+    try:
+        if os.path.exists(workspace_path):
+            shutil.rmtree(workspace_path)
+
+        if os.path.exists(db_path):
+            os.remove(db_path)
 
         return True
     except Exception as e:
-        log_event(workspace.id, 'workspace_delete_failed', {'error': str(e)})
+        if workspace_id is not None:
+            log_event(workspace_id, 'workspace_delete_failed', {'error': str(e)})
         return False
 
 
