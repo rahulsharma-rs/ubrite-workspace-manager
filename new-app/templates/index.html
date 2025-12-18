@@ -81,13 +81,53 @@
             padding: 15px 20px;
             border-bottom: 1px solid #ddd;
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toolbar-row {
+            display: flex;
             align-items: center;
+            gap: 10px;
         }
 
         .breadcrumb {
             font-size: 14px;
             color: #666;
+        }
+
+        .path-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .path-input {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background: #fafafa;
+        }
+
+        .btn-ghost {
+            padding: 8px 12px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-ghost:hover {
+            background: #f1f1f1;
+        }
+
+        .btn-ghost:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .actions button {
@@ -99,6 +139,12 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
+        }
+
+        .toolbar-row .actions {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
         }
 
         .actions button:hover {
@@ -334,12 +380,20 @@
         <div class="main-content">
             <!-- Toolbar -->
             <div class="toolbar">
-                <div class="breadcrumb" id="breadcrumb">Loading...</div>
-                <div class="actions">
-                    <button onclick="showCreateFolderModal()">+ New Folder</button>
-                    <button onclick="showCreateFileModal()">+ New File</button>
-                    <button onclick="refreshCurrentView()">🔄 Refresh</button>
+                <div class="toolbar-row">
+                    <div class="path-controls">
+                        <button id="backButton" class="btn-ghost" onclick="goBack()" disabled>⬅ Back</button>
+                        <input type="text" id="pathInput" class="path-input" value="{{ home_path }}" aria-label="Current path">
+                        <button class="btn-ghost" onclick="copyCurrentPath()" title="Copy path">Copy</button>
+                        <button class="btn-ghost" onclick="goToPathFromInput()" title="Go to path">Go</button>
+                    </div>
+                    <div class="actions">
+                        <button onclick="showCreateFolderModal()">+ New Folder</button>
+                        <button onclick="showCreateFileModal()">+ New File</button>
+                        <button onclick="refreshCurrentView()">🔄 Refresh</button>
+                    </div>
                 </div>
+                <div class="breadcrumb" id="breadcrumb">Loading...</div>
             </div>
 
             <!-- File List -->
@@ -421,20 +475,23 @@
                 <button class="btn-primary" onclick="performShare()">Share</button>
             </div>
         </div>
-    </div>
+        </div>
 
-    <script>
-        // Global state
-        let currentPath = '{{ home_path }}';
-        let currentView = 'files';
-        let selectedItem = null;
+        <script>
+            // Global state
+            const HOME_PATH = '{{ home_path }}';
+            let currentPath = HOME_PATH;
+            let currentView = 'files';
+            let selectedItem = null;
+            let pathHistory = [];
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            setupNavigation();
-            loadUsers();
-            loadFiles(currentPath);
-        });
+            // Initialize
+            document.addEventListener('DOMContentLoaded', function() {
+                setupNavigation();
+                loadUsers();
+                setupPathInput();
+                loadFiles(currentPath, { pushHistory: false });
+            });
 
         // Navigation
         function setupNavigation() {
@@ -483,9 +540,16 @@
         }
 
         // File operations
-        async function loadFiles(path) {
+        async function loadFiles(path, options = {}) {
+            const { pushHistory = true } = options;
+            const previousPath = currentPath;
+            let addedToHistory = false;
+            if (pushHistory && currentPath && path !== currentPath) {
+                pathHistory.push(currentPath);
+                addedToHistory = true;
+            }
             currentPath = path;
-            document.getElementById('breadcrumb').textContent = path;
+            updatePathUI();
             document.getElementById('content-area').innerHTML = '<div class="loading">Loading...</div>';
 
             const result = await apiCall('/api/list', 'POST', { path: path });
@@ -493,8 +557,13 @@
             if (result.success) {
                 renderFileList(result.items, result.path);
             } else {
+                if (addedToHistory) {
+                    pathHistory.pop();
+                }
+                currentPath = previousPath;
                 showError('content-area', result.error);
             }
+            updatePathUI();
         }
 
         function renderFileList(items, path) {
@@ -519,8 +588,8 @@
             `;
 
             // Add parent directory link if not at home
-            if (path !== '{{ home_path }}') {
-                const parentPath = path.substring(0, path.lastIndexOf('/')) || '{{ home_path }}';
+            if (path !== HOME_PATH) {
+                const parentPath = path.substring(0, path.lastIndexOf('/')) || HOME_PATH;
                 html += `
                     <tr onclick="loadFiles('${parentPath}')">
                         <td><span class="icon">📁</span>.. (Parent Directory)</td>
@@ -895,6 +964,53 @@
             } else {
                 alert('Error: ' + result.error);
             }
+        }
+
+        // Path bar helpers
+        function setupPathInput() {
+            const input = document.getElementById('pathInput');
+            input.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    goToPathFromInput();
+                }
+            });
+            updatePathUI();
+        }
+
+        function updatePathUI() {
+            const breadcrumb = document.getElementById('breadcrumb');
+            const input = document.getElementById('pathInput');
+            const backButton = document.getElementById('backButton');
+            if (breadcrumb) {
+                breadcrumb.textContent = currentPath;
+            }
+            if (input) {
+                input.value = currentPath;
+            }
+            if (backButton) {
+                backButton.disabled = pathHistory.length === 0;
+            }
+        }
+
+        function goBack() {
+            if (pathHistory.length === 0) return;
+            const previous = pathHistory.pop();
+            loadFiles(previous, { pushHistory: false });
+        }
+
+        function goToPathFromInput() {
+            const target = document.getElementById('pathInput').value.trim();
+            if (!target || target === currentPath) return;
+            loadFiles(target);
+        }
+
+        function copyCurrentPath() {
+            if (!navigator.clipboard) {
+                alert('Clipboard not available in this browser.');
+                return;
+            }
+            navigator.clipboard.writeText(currentPath)
+                .catch(() => alert('Unable to copy path.'));
         }
 
         // Utility functions
