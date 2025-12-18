@@ -412,6 +412,65 @@ class FileManager:
         logger.info(f"Moved: {source_path} -> {new_path}")
         return new_path
 
+    @staticmethod
+    def search(username, root_path, query, max_depth=3, max_results=200):
+        """
+        Search for files/folders under root_path matching the query (case-insensitive).
+        Limited by max_depth (relative to root) and max_results for safety.
+        """
+        is_safe, real_root, _ = PathValidator.is_safe_path(username, root_path)
+        if not is_safe:
+            raise PermissionError("Access denied")
+
+        if not os.path.exists(real_root):
+            raise FileNotFoundError(f"Path does not exist: {root_path}")
+
+        query_lower = query.lower()
+        results = []
+        root_depth = len(Path(real_root).parts)
+
+        for current_root, dirs, files in os.walk(real_root, followlinks=False):
+            depth = len(Path(current_root).parts) - root_depth
+            if depth > max_depth:
+                # Prevent descending deeper
+                dirs[:] = []
+                continue
+
+            # Combine dirs and files to check names
+            for name in dirs + files:
+                if query_lower not in name.lower():
+                    continue
+
+                full_path = os.path.join(current_root, name)
+
+                # Ensure the path is still within allowed scope (handles symlinks in shared dir)
+                is_allowed, resolved_path, _ = PathValidator.is_safe_path(username, full_path)
+                if not is_allowed:
+                    continue
+
+                try:
+                    stat_info = os.stat(full_path, follow_symlinks=False)
+                    is_link = os.path.islink(full_path)
+                    results.append({
+                        'name': name,
+                        'path': full_path,
+                        'parent_path': current_root,
+                        'is_dir': os.path.isdir(full_path),
+                        'is_file': os.path.isfile(full_path),
+                        'is_link': is_link,
+                        'size': stat_info.st_size,
+                        'modified': datetime.fromtimestamp(stat_info.st_mtime).isoformat(),
+                        'permissions': oct(stat.S_IMODE(stat_info.st_mode)),
+                    })
+                except Exception as e:
+                    logger.error(f"Error stat-ing search result {full_path}: {e}")
+                    continue
+
+                if len(results) >= max_results:
+                    return results
+
+        return results
+
 
 # ============================================================================
 # SHARING SYSTEM
@@ -717,6 +776,26 @@ def api_list_directory(user):
         return jsonify({'success': True, 'items': items, 'path': path})
     except Exception as e:
         logger.error(f"List directory error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/search', methods=['POST'])
+@require_user
+def api_search(user):
+    """Search for files/folders under a path"""
+    data = request.get_json()
+    path = data.get('path', PathValidator.get_user_home(user))
+    query = data.get('query', '').strip()
+    max_depth = int(data.get('max_depth', 3))
+    max_results = int(data.get('max_results', 200))
+
+    if not query:
+        return jsonify({'success': False, 'error': 'Search query cannot be empty'}), 400
+
+    try:
+        items = FileManager.search(user, path, query, max_depth=max_depth, max_results=max_results)
+        return jsonify({'success': True, 'items': items, 'path': path, 'query': query})
+    except Exception as e:
+        logger.error(f"Search error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 400
 
 

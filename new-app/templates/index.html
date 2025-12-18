@@ -130,6 +130,25 @@
             cursor: not-allowed;
         }
 
+        .search-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .search-hint {
+            color: #666;
+            font-size: 12px;
+        }
+
         .actions button {
             margin-left: 10px;
             padding: 8px 15px;
@@ -393,6 +412,11 @@
                         <button onclick="refreshCurrentView()">🔄 Refresh</button>
                     </div>
                 </div>
+                <div class="toolbar-row search-row">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search in current folder..." aria-label="Search">
+                    <button class="btn-ghost" onclick="performSearch()">Search</button>
+                    <span class="search-hint">Search depth limited for performance</span>
+                </div>
                 <div class="breadcrumb" id="breadcrumb">Loading...</div>
             </div>
 
@@ -481,17 +505,19 @@
             // Global state
             const HOME_PATH = '{{ home_path }}';
             let currentPath = HOME_PATH;
-            let currentView = 'files';
-            let selectedItem = null;
-            let pathHistory = [];
+        let currentView = 'files';
+        let selectedItem = null;
+        let pathHistory = [];
+        let currentSearch = { query: '', root: '' };
 
-            // Initialize
-            document.addEventListener('DOMContentLoaded', function() {
-                setupNavigation();
-                loadUsers();
-                setupPathInput();
-                loadFiles(currentPath, { pushHistory: false });
-            });
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setupNavigation();
+            loadUsers();
+            setupPathInput();
+            setupSearchInput();
+            loadFiles(currentPath, { pushHistory: false });
+        });
 
         // Navigation
         function setupNavigation() {
@@ -515,11 +541,17 @@
                 loadOutgoingShares();
             } else if (view === 'audit') {
                 loadAuditLog();
+            } else if (view === 'search' && currentSearch.query) {
+                searchFiles(currentSearch.root || currentPath, currentSearch.query);
             }
         }
 
         function refreshCurrentView() {
-            loadView(currentView);
+            if (currentView === 'search' && currentSearch.query) {
+                searchFiles(currentSearch.root || currentPath, currentSearch.query);
+            } else {
+                loadView(currentView);
+            }
         }
 
         // API calls
@@ -544,6 +576,9 @@
             const { pushHistory = true } = options;
             const previousPath = currentPath;
             let addedToHistory = false;
+            // Leaving other views (like search) returns to standard file view
+            currentView = 'files';
+            currentSearch = { query: '', root: '' };
             if (pushHistory && currentPath && path !== currentPath) {
                 pathHistory.push(currentPath);
                 addedToHistory = true;
@@ -964,6 +999,89 @@
             } else {
                 alert('Error: ' + result.error);
             }
+        }
+
+        // Search operations
+        function setupSearchInput() {
+            const searchInput = document.getElementById('searchInput');
+            searchInput.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    performSearch();
+                }
+            });
+        }
+
+        function performSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) {
+                // Empty query returns to current folder view
+                currentView = 'files';
+                loadFiles(currentPath);
+                return;
+            }
+            searchFiles(currentPath, query);
+        }
+
+        async function searchFiles(rootPath, query) {
+            currentView = 'search';
+            currentSearch = { query, root: rootPath };
+            document.getElementById('breadcrumb').textContent = `Search "${query}" under ${rootPath}`;
+            document.getElementById('content-area').innerHTML = '<div class="loading">Searching...</div>';
+
+            const result = await apiCall('/api/search', 'POST', {
+                path: rootPath,
+                query: query
+            });
+
+            if (result.success) {
+                renderSearchResults(result.items, query, rootPath);
+            } else {
+                showError('content-area', result.error);
+            }
+        }
+
+        function renderSearchResults(items, query, rootPath) {
+            if (!items || items.length === 0) {
+                document.getElementById('content-area').innerHTML =
+                    `<div class="empty-state">No matches for "${query}" under ${rootPath}</div>`;
+                return;
+            }
+
+            let html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Location</th>
+                            <th>Type</th>
+                            <th>Modified</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            items.forEach(item => {
+                const typeLabel = item.is_dir ? 'Folder' : (item.is_link ? 'Symlink' : 'File');
+                const modified = new Date(item.modified).toLocaleString();
+                const openPath = item.is_dir ? item.path : item.parent_path || rootPath;
+                const openActionLabel = item.is_dir ? 'Open' : 'Open Location';
+
+                html += `
+                    <tr>
+                        <td>${item.name}${item.is_link ? ' 🔗' : ''}</td>
+                        <td>${item.parent_path || '-'}</td>
+                        <td>${typeLabel}</td>
+                        <td>${modified}</td>
+                        <td>
+                            <button onclick="loadFiles('${openPath}', { pushHistory: true })">${openActionLabel}</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('content-area').innerHTML = html;
         }
 
         // Path bar helpers
