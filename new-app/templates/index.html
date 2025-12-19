@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Manager - {{ username }}</title>
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -12,62 +15,162 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-            color: #333;
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f1f3f4;
+            color: #202124;
+            overflow: hidden;
         }
 
-        .container {
+        .app-container {
             display: flex;
             height: 100vh;
         }
 
-        /* Sidebar */
+        /* Left Sidebar Navigation */
         .sidebar {
-            width: 250px;
-            background: #2c3e50;
+            width: 256px;
+            background: #fff;
+            border-right: 1px solid #dadce0;
+            display: flex;
+            flex-direction: column;
+            padding: 8px 0;
+        }
+
+        .sidebar-header {
+            padding: 20px 16px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar-logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             color: white;
-            padding: 20px;
-            overflow-y: auto;
-        }
-
-        .sidebar h2 {
-            margin-bottom: 20px;
             font-size: 20px;
-            border-bottom: 2px solid #34495e;
-            padding-bottom: 10px;
         }
 
-        .sidebar .user-info {
-            background: #34495e;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
+        .sidebar-title {
+            font-size: 22px;
+            font-weight: 400;
+            color: #5f6368;
         }
 
-        .sidebar nav ul {
-            list-style: none;
+        .create-button {
+            margin: 8px 12px 20px;
+            padding: 12px 24px;
+            background: #fff;
+            border: 1px solid #dadce0;
+            border-radius: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #202124;
+            transition: all 0.2s;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
         }
 
-        .sidebar nav li {
-            margin: 10px 0;
+        .create-button:hover {
+            background: #f8f9fa;
+            box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
         }
 
-        .sidebar nav a {
-            color: #ecf0f1;
-            text-decoration: none;
+        .create-button .material-icons {
+            color: #1a73e8;
+            font-size: 24px;
+        }
+
+        .create-dropdown {
+            display: none;
+            position: absolute;
+            top: 140px;
+            left: 12px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            z-index: 1000;
+            min-width: 200px;
+            padding: 8px 0;
+        }
+
+        .create-dropdown.show {
             display: block;
-            padding: 10px;
-            border-radius: 5px;
-            transition: background 0.3s;
         }
 
-        .sidebar nav a:hover,
-        .sidebar nav a.active {
-            background: #34495e;
+        .create-dropdown-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            color: #202124;
         }
 
-        /* Main content */
+        .create-dropdown-item:hover {
+            background: #f1f3f4;
+        }
+
+        .create-dropdown-item .material-icons {
+            font-size: 20px;
+            color: #5f6368;
+        }
+
+        .nav-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 12px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            margin: 2px 0;
+            border-radius: 24px;
+            cursor: pointer;
+            transition: background 0.2s;
+            color: #5f6368;
+            font-size: 14px;
+            font-weight: 500;
+            gap: 16px;
+        }
+
+        .nav-item:hover {
+            background: #f1f3f4;
+        }
+
+        .nav-item.active {
+            background: #e8f0fe;
+            color: #1a73e8;
+        }
+
+        .nav-item .material-icons {
+            font-size: 20px;
+        }
+
+        .nav-divider {
+            height: 1px;
+            background: #dadce0;
+            margin: 12px 0;
+        }
+
+        .sidebar-footer {
+            padding: 12px 16px;
+            border-top: 1px solid #dadce0;
+            font-size: 12px;
+            color: #5f6368;
+        }
+
+        /* Main Content Area */
         .main-content {
             flex: 1;
             display: flex;
@@ -75,461 +178,852 @@
             overflow: hidden;
         }
 
-        /* Toolbar */
-        .toolbar {
-            background: white;
-            padding: 15px 20px;
-            border-bottom: 1px solid #ddd;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .toolbar-row {
+        /* Top Bar */
+        .top-bar {
+            height: 64px;
+            background: #fff;
+            border-bottom: 1px solid #dadce0;
             display: flex;
             align-items: center;
-            gap: 10px;
+            padding: 0 20px;
+            gap: 16px;
         }
 
-        .breadcrumb {
-            font-size: 14px;
-            color: #666;
-        }
-
-        .path-controls {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .search-container {
             flex: 1;
+            max-width: 720px;
         }
 
-        .path-input {
-            flex: 1;
-            padding: 8px 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-            background: #fafafa;
-        }
-
-        .btn-ghost {
-            padding: 8px 12px;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .btn-ghost:hover {
-            background: #f1f1f1;
-        }
-
-        .btn-ghost:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .search-row {
+        .search-box {
             display: flex;
             align-items: center;
-            gap: 10px;
+            background: #f1f3f4;
+            border-radius: 8px;
+            padding: 0 16px;
+            height: 48px;
+            transition: all 0.2s;
+        }
+
+        .search-box:hover {
+            background: #e8eaed;
+        }
+
+        .search-box:focus-within {
+            background: #fff;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 2px 6px 2px rgba(60,64,67,0.15);
+        }
+
+        .search-box .material-icons {
+            color: #5f6368;
+            font-size: 20px;
+            margin-right: 12px;
         }
 
         .search-input {
             flex: 1;
-            padding: 8px 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-
-        .search-hint {
-            color: #666;
-            font-size: 12px;
-        }
-
-        .actions button {
-            margin-left: 10px;
-            padding: 8px 15px;
-            background: #3498db;
-            color: white;
             border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
+            background: transparent;
+            font-size: 16px;
+            outline: none;
+            color: #202124;
         }
 
-        .toolbar-row .actions {
-            margin-left: auto;
+        .search-input::placeholder {
+            color: #5f6368;
+        }
+
+        .top-bar-actions {
             display: flex;
             align-items: center;
+            gap: 8px;
         }
 
-        .actions button:hover {
-            background: #2980b9;
+        .icon-button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            color: #5f6368;
         }
 
-        .actions button.danger {
-            background: #e74c3c;
+        .icon-button:hover {
+            background: #f1f3f4;
         }
 
-        .actions button.danger:hover {
-            background: #c0392b;
+        .icon-button .material-icons {
+            font-size: 20px;
         }
 
-        /* File list */
-        .file-list-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-        }
-
-        table {
-            width: 100%;
-            background: white;
-            border-collapse: collapse;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        thead {
-            background: #34495e;
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #1a73e8, #34a853);
+            display: flex;
+            align-items: center;
+            justify-content: center;
             color: white;
-        }
-
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-
-        tbody tr:hover {
-            background: #f8f9fa;
+            font-weight: 500;
+            font-size: 14px;
             cursor: pointer;
         }
 
-        .icon {
-            margin-right: 8px;
+        /* Content Area */
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 32px;
         }
 
-        .file-row {
+        /* Breadcrumb */
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #5f6368;
+            gap: 4px;
+        }
+
+        .breadcrumb-item {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .breadcrumb-item:hover {
+            background: #f1f3f4;
+        }
+
+        .breadcrumb-separator {
+            color: #dadce0;
+            margin: 0 4px;
+        }
+
+        /* View Toggle */
+        .view-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .view-toggle {
+            display: flex;
+            gap: 4px;
+        }
+
+        .view-toggle-btn {
+            padding: 8px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 4px;
+            color: #5f6368;
+        }
+
+        .view-toggle-btn:hover {
+            background: #f1f3f4;
+        }
+
+        .view-toggle-btn.active {
+            color: #1a73e8;
+            background: #e8f0fe;
+        }
+
+        /* File Grid View */
+        .file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .file-card {
+            background: #fff;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
             position: relative;
         }
 
-        .file-actions {
-            display: none;
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
+        .file-card:hover {
+            box-shadow: 0 1px 3px rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
+            border-color: transparent;
         }
 
-        .file-row:hover .file-actions {
-            display: block;
+        .file-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+            color: #5f6368;
         }
 
-        .file-actions button {
-            margin: 0 5px;
-            padding: 5px 10px;
+        .file-icon.folder {
+            color: #5f6368;
+        }
+
+        .file-icon.document {
+            color: #1a73e8;
+        }
+
+        .file-name {
+            font-size: 14px;
+            color: #202124;
+            font-weight: 500;
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-meta {
             font-size: 12px;
-            background: #3498db;
-            color: white;
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
+            color: #5f6368;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .file-actions button:hover {
-            background: #2980b9;
+        .file-actions-menu {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .file-card:hover .file-actions-menu {
+            opacity: 1;
+        }
+
+        /* List View */
+        .file-list {
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #dadce0;
+            margin-top: 16px;
+        }
+
+        .file-list-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 100px;
+            gap: 16px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #dadce0;
+            font-size: 12px;
+            font-weight: 500;
+            color: #5f6368;
+            text-transform: uppercase;
+        }
+
+        .file-list-item {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 100px;
+            gap: 16px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f1f3f4;
+            cursor: pointer;
+            transition: background 0.2s;
+            align-items: center;
+        }
+
+        .file-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-list-item:hover {
+            background: #f8f9fa;
+        }
+
+        .file-list-name {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            color: #202124;
+        }
+
+        .file-list-name .material-icons {
+            font-size: 20px;
+            color: #5f6368;
+        }
+
+        .file-list-info {
+            font-size: 13px;
+            color: #5f6368;
         }
 
         /* Modal */
-        .modal {
+        .modal-overlay {
             display: none;
             position: fixed;
-            z-index: 1000;
-            left: 0;
             top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
         }
 
-        .modal-content {
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
             background: white;
-            margin: 10% auto;
-            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
             width: 90%;
             max-width: 500px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            max-height: 80vh;
+            overflow: auto;
         }
 
-        .modal h3 {
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #dadce0;
+            font-size: 18px;
+            font-weight: 500;
+            color: #202124;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .form-field {
             margin-bottom: 20px;
         }
 
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
+        .form-label {
             display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #202124;
+            font-weight: 500;
         }
 
-        .form-group input,
-        .form-group select {
+        .form-input,
+        .form-select {
             width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
+            padding: 12px 16px;
+            border: 1px solid #dadce0;
             border-radius: 4px;
             font-size: 14px;
+            color: #202124;
+            outline: none;
+            transition: border-color 0.2s;
         }
 
-        .modal-actions {
+        .form-input:focus,
+        .form-select:focus {
+            border-color: #1a73e8;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #dadce0;
             display: flex;
             justify-content: flex-end;
-            margin-top: 20px;
+            gap: 8px;
         }
 
-        .modal-actions button {
-            margin-left: 10px;
-            padding: 10px 20px;
-            border: none;
+        .btn {
+            padding: 10px 24px;
             border-radius: 4px;
-            cursor: pointer;
             font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-text {
+            background: transparent;
+            color: #1a73e8;
+        }
+
+        .btn-text:hover {
+            background: #f1f3f4;
         }
 
         .btn-primary {
-            background: #3498db;
+            background: #1a73e8;
             color: white;
         }
 
         .btn-primary:hover {
-            background: #2980b9;
+            background: #1557b0;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
         }
 
-        .btn-secondary {
-            background: #95a5a6;
+        .btn-danger {
+            background: #ea4335;
             color: white;
         }
 
-        .btn-secondary:hover {
-            background: #7f8c8d;
+        .btn-danger:hover {
+            background: #d33b2c;
         }
 
-        .error {
-            color: #e74c3c;
-            background: #fadbd8;
-            padding: 10px;
+        /* Alert Messages */
+        .alert {
+            padding: 12px 16px;
             border-radius: 4px;
-            margin-bottom: 15px;
+            margin-bottom: 16px;
             display: none;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
         }
 
-        .success {
-            color: #27ae60;
-            background: #d5f4e6;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            display: none;
+        .alert.show {
+            display: flex;
         }
 
-        .loading {
+        .alert-error {
+            background: #fce8e6;
+            color: #c5221f;
+            border-left: 4px solid #ea4335;
+        }
+
+        .alert-success {
+            background: #e6f4ea;
+            color: #137333;
+            border-left: 4px solid #34a853;
+        }
+
+        /* Loading State */
+        .loading-state {
             text-align: center;
-            padding: 50px;
-            font-size: 18px;
-            color: #666;
+            padding: 60px 20px;
+            color: #5f6368;
         }
 
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f1f3f4;
+            border-top-color: #1a73e8;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
         .empty-state {
             text-align: center;
-            padding: 50px;
-            color: #999;
+            padding: 60px 20px;
+            color: #5f6368;
         }
 
+        .empty-state .material-icons {
+            font-size: 96px;
+            color: #dadce0;
+            margin-bottom: 16px;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            color: #202124;
+            font-weight: 400;
+            margin-bottom: 8px;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+            color: #5f6368;
+        }
+
+        /* Badges */
         .badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 3px;
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 12px;
             font-size: 11px;
-            font-weight: bold;
+            font-weight: 500;
+            gap: 4px;
         }
 
         .badge-view {
-            background: #3498db;
-            color: white;
+            background: #e8f0fe;
+            color: #1a73e8;
         }
 
         .badge-edit {
-            background: #2ecc71;
-            color: white;
+            background: #e6f4ea;
+            color: #137333;
         }
 
         .badge-broken {
-            background: #e74c3c;
-            color: white;
+            background: #fce8e6;
+            color: #c5221f;
+        }
+
+        .badge-shared {
+            background: #fef7e0;
+            color: #b06000;
+        }
+
+        /* Context Menu */
+        .context-menu {
+            display: none;
+            position: fixed;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            z-index: 3000;
+            padding: 4px 0;
+            min-width: 180px;
+        }
+
+        .context-menu.show {
+            display: block;
+        }
+
+        .context-menu-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            color: #202124;
+        }
+
+        .context-menu-item:hover {
+            background: #f1f3f4;
+        }
+
+        .context-menu-item .material-icons {
+            font-size: 18px;
+            color: #5f6368;
+        }
+
+        .context-menu-divider {
+            height: 1px;
+            background: #dadce0;
+            margin: 4px 0;
+        }
+
+        /* Share List */
+        .share-list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .share-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .share-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #f1f3f4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: #5f6368;
+        }
+
+        .share-details {
+            flex: 1;
+        }
+
+        .share-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #202124;
+        }
+
+        .share-path {
+            font-size: 12px;
+            color: #5f6368;
+            margin-top: 2px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 64px;
+            }
+
+            .sidebar-title,
+            .nav-item span,
+            .create-button span {
+                display: none;
+            }
+
+            .file-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+
+            .file-list-header,
+            .file-list-item {
+                grid-template-columns: 2fr 1fr 80px;
+            }
+
+            .file-list-item .file-list-info:nth-child(3) {
+                display: none;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Sidebar -->
+    <div class="app-container">
+        <!-- Left Sidebar -->
         <div class="sidebar">
-            <h2>File Manager</h2>
-            <div class="user-info">
-                <strong>User:</strong> {{ username }}<br>
-                <small>Home: {{ home_path }}</small>
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <span class="material-icons">folder</span>
+                </div>
+                <div class="sidebar-title">Files</div>
             </div>
-            <nav>
-                <ul>
-                    <li><a href="#" class="nav-link active" data-view="files">📁 My Files</a></li>
-                    <li><a href="#" class="nav-link" data-view="shared-with-me">📥 Shared with Me</a></li>
-                    <li><a href="#" class="nav-link" data-view="shared-by-me">📤 Shared by Me</a></li>
-                    <li><a href="#" class="nav-link" data-view="audit">📋 Activity Log</a></li>
-                </ul>
-            </nav>
+
+            <button class="create-button" onclick="toggleCreateDropdown()">
+                <span class="material-icons">add</span>
+                <span>New</span>
+            </button>
+
+            <div class="create-dropdown" id="createDropdown">
+                <div class="create-dropdown-item" onclick="showCreateFolderModal(); hideCreateDropdown();">
+                    <span class="material-icons">create_new_folder</span>
+                    <span>New Folder</span>
+                </div>
+                <div class="create-dropdown-item" onclick="showCreateFileModal(); hideCreateDropdown();">
+                    <span class="material-icons">insert_drive_file</span>
+                    <span>New File</span>
+                </div>
+            </div>
+
+            <div class="nav-list">
+                <div class="nav-item active" data-view="files" onclick="switchView('files')">
+                    <span class="material-icons">folder</span>
+                    <span>My Files</span>
+                </div>
+                <div class="nav-item" data-view="shared-with-me" onclick="switchView('shared-with-me')">
+                    <span class="material-icons">people</span>
+                    <span>Shared with me</span>
+                </div>
+                <div class="nav-item" data-view="shared-by-me" onclick="switchView('shared-by-me')">
+                    <span class="material-icons">reply</span>
+                    <span>Shared by me</span>
+                </div>
+                <div class="nav-divider"></div>
+                <div class="nav-item" data-view="audit" onclick="switchView('audit')">
+                    <span class="material-icons">history</span>
+                    <span>Activity</span>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <strong>{{ username }}</strong><br>
+                <small style="color: #80868b;">{{ home_path }}</small>
+            </div>
         </div>
 
         <!-- Main Content -->
         <div class="main-content">
-            <!-- Toolbar -->
-            <div class="toolbar">
-                <div class="toolbar-row">
-                    <div class="path-controls">
-                        <button id="backButton" class="btn-ghost" onclick="goBack()" disabled>⬅ Back</button>
-                        <input type="text" id="pathInput" class="path-input" value="{{ home_path }}" aria-label="Current path">
-                        <button class="btn-ghost" onclick="copyCurrentPath()" title="Copy path">Copy</button>
-                        <button class="btn-ghost" onclick="goToPathFromInput()" title="Go to path">Go</button>
-                    </div>
-                    <div class="actions">
-                        <button onclick="showCreateFolderModal()">+ New Folder</button>
-                        <button onclick="showCreateFileModal()">+ New File</button>
-                        <button onclick="refreshCurrentView()">🔄 Refresh</button>
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <div class="search-container">
+                    <div class="search-box">
+                        <span class="material-icons">search</span>
+                        <input type="text" class="search-input" id="searchInput" placeholder="Search files" onkeypress="handleSearchKeypress(event)">
                     </div>
                 </div>
-                <div class="toolbar-row search-row">
-                    <input type="text" id="searchInput" class="search-input" placeholder="Search in current folder..." aria-label="Search">
-                    <button class="btn-ghost" onclick="performSearch()">Search</button>
-                    <span class="search-hint">Search depth limited for performance</span>
+                <div class="top-bar-actions">
+                    <button class="icon-button" onclick="refreshCurrentView()" title="Refresh">
+                        <span class="material-icons">refresh</span>
+                    </button>
+                    <button class="icon-button" onclick="toggleViewMode()" title="Toggle view">
+                        <span class="material-icons" id="viewModeIcon">grid_view</span>
+                    </button>
+                    <div class="user-avatar" title="{{ username }}">
+                        {{ username[0]|upper }}
+                    </div>
                 </div>
-                <div class="breadcrumb" id="breadcrumb">Loading...</div>
             </div>
 
-            <!-- File List -->
-            <div class="file-list-container" id="content-area">
-                <div class="loading">Loading...</div>
+            <!-- Content Area -->
+            <div class="content-area" id="contentArea">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <div>Loading...</div>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- Context Menu -->
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" onclick="handleContextAction('rename')">
+            <span class="material-icons">edit</span>
+            <span>Rename</span>
+        </div>
+        <div class="context-menu-item" onclick="handleContextAction('share')">
+            <span class="material-icons">share</span>
+            <span>Share</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" onclick="handleContextAction('delete')">
+            <span class="material-icons">delete</span>
+            <span>Delete</span>
+        </div>
+    </div>
+
     <!-- Create Folder Modal -->
-    <div id="createFolderModal" class="modal">
-        <div class="modal-content">
-            <h3>Create New Folder</h3>
-            <div class="error" id="createFolderError"></div>
-            <div class="form-group">
-                <label for="folderName">Folder Name:</label>
-                <input type="text" id="folderName" placeholder="Enter folder name">
+    <div class="modal-overlay" id="createFolderModal">
+        <div class="modal">
+            <div class="modal-header">New Folder</div>
+            <div class="modal-body">
+                <div class="alert alert-error" id="createFolderError"></div>
+                <div class="form-field">
+                    <label class="form-label" for="folderNameInput">Folder name</label>
+                    <input type="text" class="form-input" id="folderNameInput" placeholder="Untitled folder" onkeypress="handleModalKeypress(event, 'createFolder')">
+                </div>
             </div>
-            <div class="modal-actions">
-                <button class="btn-secondary" onclick="closeModal('createFolderModal')">Cancel</button>
-                <button class="btn-primary" onclick="createFolder()">Create</button>
+            <div class="modal-footer">
+                <button class="btn btn-text" onclick="closeModal('createFolderModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="createFolder()">Create</button>
             </div>
         </div>
     </div>
 
     <!-- Create File Modal -->
-    <div id="createFileModal" class="modal">
-        <div class="modal-content">
-            <h3>Create New File</h3>
-            <div class="error" id="createFileError"></div>
-            <div class="form-group">
-                <label for="fileName">File Name:</label>
-                <input type="text" id="fileName" placeholder="Enter file name">
+    <div class="modal-overlay" id="createFileModal">
+        <div class="modal">
+            <div class="modal-header">New File</div>
+            <div class="modal-body">
+                <div class="alert alert-error" id="createFileError"></div>
+                <div class="form-field">
+                    <label class="form-label" for="fileNameInput">File name</label>
+                    <input type="text" class="form-input" id="fileNameInput" placeholder="Untitled.txt" onkeypress="handleModalKeypress(event, 'createFile')">
+                </div>
             </div>
-            <div class="modal-actions">
-                <button class="btn-secondary" onclick="closeModal('createFileModal')">Cancel</button>
-                <button class="btn-primary" onclick="createFile()">Create</button>
+            <div class="modal-footer">
+                <button class="btn btn-text" onclick="closeModal('createFileModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="createFile()">Create</button>
             </div>
         </div>
     </div>
 
     <!-- Rename Modal -->
-    <div id="renameModal" class="modal">
-        <div class="modal-content">
-            <h3>Rename Item</h3>
-            <div class="error" id="renameError"></div>
-            <div class="form-group">
-                <label for="newName">New Name:</label>
-                <input type="text" id="newName" placeholder="Enter new name">
+    <div class="modal-overlay" id="renameModal">
+        <div class="modal">
+            <div class="modal-header">Rename</div>
+            <div class="modal-body">
+                <div class="alert alert-error" id="renameError"></div>
+                <div class="form-field">
+                    <label class="form-label" for="newNameInput">New name</label>
+                    <input type="text" class="form-input" id="newNameInput" onkeypress="handleModalKeypress(event, 'performRename')">
+                </div>
             </div>
-            <div class="modal-actions">
-                <button class="btn-secondary" onclick="closeModal('renameModal')">Cancel</button>
-                <button class="btn-primary" onclick="performRename()">Rename</button>
+            <div class="modal-footer">
+                <button class="btn btn-text" onclick="closeModal('renameModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="performRename()">Rename</button>
             </div>
         </div>
     </div>
 
     <!-- Share Modal -->
-    <div id="shareModal" class="modal">
-        <div class="modal-content">
-            <h3>Share Item</h3>
-            <div class="error" id="shareError"></div>
-            <div class="success" id="shareSuccess"></div>
-            <div class="form-group">
-                <label for="shareRecipient">Share with User:</label>
-                <select id="shareRecipient">
-                    <option value="">Select user...</option>
-                </select>
+    <div class="modal-overlay" id="shareModal">
+        <div class="modal">
+            <div class="modal-header">Share</div>
+            <div class="modal-body">
+                <div class="alert alert-error" id="shareError"></div>
+                <div class="alert alert-success" id="shareSuccess"></div>
+                <div class="form-field">
+                    <label class="form-label" for="shareRecipientSelect">Share with</label>
+                    <select class="form-select" id="shareRecipientSelect">
+                        <option value="">Select a user...</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="sharePermissionSelect">Permission</label>
+                    <select class="form-select" id="sharePermissionSelect">
+                        <option value="view">Viewer</option>
+                        <option value="edit">Editor</option>
+                    </select>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="sharePermission">Permission Level:</label>
-                <select id="sharePermission">
-                    <option value="view">View Only</option>
-                    <option value="edit">Can Edit</option>
-                </select>
-            </div>
-            <div class="modal-actions">
-                <button class="btn-secondary" onclick="closeModal('shareModal')">Cancel</button>
-                <button class="btn-primary" onclick="performShare()">Share</button>
+            <div class="modal-footer">
+                <button class="btn btn-text" onclick="closeModal('shareModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="performShare()">Share</button>
             </div>
         </div>
-        </div>
+    </div>
 
-        <script>
-            // Global state
-            const HOME_PATH = '{{ home_path }}';
-            let currentPath = HOME_PATH;
+    <script>
+        // Global State
+        const HOME_PATH = '{{ home_path }}';
+        let currentPath = HOME_PATH;
         let currentView = 'files';
+        let viewMode = 'grid'; // 'grid' or 'list'
         let selectedItem = null;
         let pathHistory = [];
+        let contextMenuItem = null;
         let currentSearch = { query: '', root: '' };
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            setupNavigation();
             loadUsers();
-            setupPathInput();
-            setupSearchInput();
             loadFiles(currentPath, { pushHistory: false });
+            setupClickOutside();
         });
 
-        // Navigation
-        function setupNavigation() {
-            document.querySelectorAll('.nav-link').forEach(link => {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-                    this.classList.add('active');
-                    currentView = this.dataset.view;
-                    loadView(currentView);
-                });
+        // Click outside handlers
+        function setupClickOutside() {
+            document.addEventListener('click', function(e) {
+                const dropdown = document.getElementById('createDropdown');
+                const createButton = document.querySelector('.create-button');
+                if (!dropdown.contains(e.target) && !createButton.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+
+                const contextMenu = document.getElementById('contextMenu');
+                if (!contextMenu.contains(e.target)) {
+                    contextMenu.classList.remove('show');
+                }
             });
+        }
+
+        // Navigation
+        function switchView(view) {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(`.nav-item[data-view="${view}"]`).classList.add('active');
+            currentView = view;
+            loadView(view);
         }
 
         function loadView(view) {
@@ -554,415 +1048,606 @@
             }
         }
 
-        // API calls
+        // View Mode
+        function toggleViewMode() {
+            viewMode = viewMode === 'grid' ? 'list' : 'grid';
+            document.getElementById('viewModeIcon').textContent = viewMode === 'grid' ? 'list' : 'grid_view';
+            refreshCurrentView();
+        }
+
+        // Create Dropdown
+        function toggleCreateDropdown() {
+            document.getElementById('createDropdown').classList.toggle('show');
+        }
+
+        function hideCreateDropdown() {
+            document.getElementById('createDropdown').classList.remove('show');
+        }
+
+        // API Calls
         async function apiCall(url, method = 'GET', body = null) {
             const options = {
                 method: method,
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'Content-Type': 'application/json' }
             };
-
-            if (body) {
-                options.body = JSON.stringify(body);
-            }
-
+            if (body) options.body = JSON.stringify(body);
             const response = await fetch(url, options);
             return await response.json();
         }
 
-        // File operations
+        // File Operations
         async function loadFiles(path, options = {}) {
             const { pushHistory = true } = options;
             const previousPath = currentPath;
             let addedToHistory = false;
-            // Leaving other views (like search) returns to standard file view
+
             currentView = 'files';
             currentSearch = { query: '', root: '' };
+
             if (pushHistory && currentPath && path !== currentPath) {
                 pathHistory.push(currentPath);
                 addedToHistory = true;
             }
             currentPath = path;
-            updatePathUI();
-            document.getElementById('content-area').innerHTML = '<div class="loading">Loading...</div>';
+            showLoading();
 
             const result = await apiCall('/api/list', 'POST', { path: path });
 
             if (result.success) {
-                renderFileList(result.items, result.path);
+                renderFileView(result.items, result.path);
             } else {
-                if (addedToHistory) {
-                    pathHistory.pop();
-                }
+                if (addedToHistory) pathHistory.pop();
                 currentPath = previousPath;
-                showError('content-area', result.error);
+                showError(result.error);
             }
-            updatePathUI();
         }
 
-        function renderFileList(items, path) {
+        function renderFileView(items, path) {
+            let html = '';
+
+            // Breadcrumb
+            html += renderBreadcrumb(path);
+
+            // Empty state
             if (items.length === 0) {
-                document.getElementById('content-area').innerHTML =
-                    '<div class="empty-state">No files or folders in this directory</div>';
+                html += `
+                    <div class="empty-state">
+                        <span class="material-icons">folder_open</span>
+                        <h3>This folder is empty</h3>
+                        <p>Create a new folder or file to get started</p>
+                    </div>
+                `;
+                document.getElementById('contentArea').innerHTML = html;
                 return;
             }
 
-            let html = `
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Size</th>
-                            <th>Modified</th>
-                            <th>Permissions</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
+            if (viewMode === 'grid') {
+                html += '<div class="file-grid">';
 
-            // Add parent directory link if not at home
-            if (path !== HOME_PATH) {
-                const parentPath = path.substring(0, path.lastIndexOf('/')) || HOME_PATH;
+                // Parent directory
+                if (path !== HOME_PATH) {
+                    const parentPath = path.substring(0, path.lastIndexOf('/')) || HOME_PATH;
+                    html += `
+                        <div class="file-card" onclick="loadFiles('${escapeHtml(parentPath)}')" title="Go up">
+                            <div class="file-icon material-icons folder">folder</div>
+                            <div class="file-name">...</div>
+                            <div class="file-meta">Parent folder</div>
+                        </div>
+                    `;
+                }
+
+                items.forEach(item => {
+                    const icon = item.is_dir ? 'folder' : getFileIcon(item.name);
+                    const iconClass = item.is_dir ? 'folder' : 'document';
+                    const badge = item.is_link ? '<span class="badge badge-shared"><span class="material-icons" style="font-size: 11px;">link</span> Link</span>' : '';
+                    const brokenBadge = item.link_broken ? '<span class="badge badge-broken">Broken</span>' : '';
+                    const modified = new Date(item.modified).toLocaleDateString();
+
+                    html += `
+                        <div class="file-card" onclick="handleFileClick('${escapeHtml(item.path)}', ${item.is_dir})"
+                             oncontextmenu="showContextMenu(event, '${escapeHtml(item.path)}', '${escapeHtml(item.name)}', ${item.writable})">
+                            <div class="file-actions-menu">
+                                <button class="icon-button" onclick="event.stopPropagation(); showContextMenu(event, '${escapeHtml(item.path)}', '${escapeHtml(item.name)}', ${item.writable})">
+                                    <span class="material-icons">more_vert</span>
+                                </button>
+                            </div>
+                            <div class="file-icon material-icons ${iconClass}">${icon}</div>
+                            <div class="file-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+                            <div class="file-meta">
+                                ${item.is_dir ? '' : formatBytes(item.size) + ' • '}${modified}
+                                ${badge}${brokenBadge}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            } else {
+                // List view
                 html += `
-                    <tr onclick="loadFiles('${parentPath}')">
-                        <td><span class="icon">📁</span>.. (Parent Directory)</td>
-                        <td>-</td>
-                        <td>-</td>
-                        <td>-</td>
-                        <td></td>
-                    </tr>
+                    <div class="file-list">
+                        <div class="file-list-header">
+                            <div>Name</div>
+                            <div>Size</div>
+                            <div>Modified</div>
+                            <div>Actions</div>
+                        </div>
                 `;
+
+                // Parent directory
+                if (path !== HOME_PATH) {
+                    const parentPath = path.substring(0, path.lastIndexOf('/')) || HOME_PATH;
+                    html += `
+                        <div class="file-list-item" onclick="loadFiles('${escapeHtml(parentPath)}')">
+                            <div class="file-list-name">
+                                <span class="material-icons">folder</span>
+                                <span>... (Parent folder)</span>
+                            </div>
+                            <div class="file-list-info">-</div>
+                            <div class="file-list-info">-</div>
+                            <div></div>
+                        </div>
+                    `;
+                }
+
+                items.forEach(item => {
+                    const icon = item.is_dir ? 'folder' : getFileIcon(item.name);
+                    const size = item.is_dir ? '-' : formatBytes(item.size);
+                    const modified = new Date(item.modified).toLocaleString();
+                    const badge = item.is_link ? '<span class="badge badge-shared">Link</span>' : '';
+                    const brokenBadge = item.link_broken ? '<span class="badge badge-broken">Broken</span>' : '';
+
+                    html += `
+                        <div class="file-list-item" onclick="handleFileClick('${escapeHtml(item.path)}', ${item.is_dir})"
+                             oncontextmenu="showContextMenu(event, '${escapeHtml(item.path)}', '${escapeHtml(item.name)}', ${item.writable})">
+                            <div class="file-list-name">
+                                <span class="material-icons">${icon}</span>
+                                <span>${escapeHtml(item.name)} ${badge}${brokenBadge}</span>
+                            </div>
+                            <div class="file-list-info">${size}</div>
+                            <div class="file-list-info">${modified}</div>
+                            <div>
+                                <button class="icon-button" onclick="event.stopPropagation(); showContextMenu(event, '${escapeHtml(item.path)}', '${escapeHtml(item.name)}', ${item.writable})">
+                                    <span class="material-icons">more_vert</span>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
             }
 
-            items.forEach(item => {
-                const icon = item.is_dir ? '📁' : '📄';
-                const size = item.is_dir ? '-' : formatBytes(item.size);
-                const modified = new Date(item.modified).toLocaleString();
-                const onClick = item.is_dir ? `loadFiles('${item.path}')` : '';
-                const linkBadge = item.is_link ? ' 🔗' : '';
-                const brokenBadge = item.link_broken ? ' <span class="badge badge-broken">Broken</span>' : '';
+            document.getElementById('contentArea').innerHTML = html;
+        }
 
-                html += `
-                    <tr class="file-row" ${onClick ? `onclick="${onClick}"` : ''}>
-                        <td><span class="icon">${icon}</span>${item.name}${linkBadge}${brokenBadge}</td>
-                        <td>${size}</td>
-                        <td>${modified}</td>
-                        <td>${item.permissions}</td>
-                        <td class="file-actions">
-                            ${item.writable ? `<button onclick="event.stopPropagation(); showRenameModal('${item.path}', '${item.name}')">Rename</button>` : ''}
-                            ${item.writable ? `<button onclick="event.stopPropagation(); deleteItem('${item.path}', '${item.name}')">Delete</button>` : ''}
-                            <button onclick="event.stopPropagation(); showShareModal('${item.path}')">Share</button>
-                        </td>
-                    </tr>
-                `;
+        function renderBreadcrumb(path) {
+            const parts = path.split('/').filter(p => p);
+            let breadcrumb = '<div class="breadcrumb">';
+
+            breadcrumb += `<span class="breadcrumb-item" onclick="loadFiles('${HOME_PATH}')"><span class="material-icons" style="font-size: 18px;">home</span></span>`;
+
+            let currentPath = '';
+            parts.forEach((part, index) => {
+                currentPath += '/' + part;
+                if (currentPath === HOME_PATH.split('/').slice(0, -1).join('/')) return;
+
+                breadcrumb += '<span class="breadcrumb-separator material-icons" style="font-size: 16px;">chevron_right</span>';
+                if (index === parts.length - 1) {
+                    breadcrumb += `<span class="breadcrumb-item" style="font-weight: 500; color: #202124;">${escapeHtml(part)}</span>`;
+                } else {
+                    breadcrumb += `<span class="breadcrumb-item" onclick="loadFiles('${escapeHtml(currentPath)}')">${escapeHtml(part)}</span>`;
+                }
             });
 
-            html += '</tbody></table>';
-            document.getElementById('content-area').innerHTML = html;
+            breadcrumb += '</div>';
+            return breadcrumb;
         }
 
-        // Sharing operations
-        async function loadUsers() {
-            const result = await apiCall('/api/users');
-            if (result.success) {
-                const select = document.getElementById('shareRecipient');
-                result.users.forEach(user => {
-                    const option = document.createElement('option');
-                    option.value = user.username;
-                    option.textContent = `${user.username} (${user.fullname})`;
-                    select.appendChild(option);
-                });
+        function handleFileClick(path, isDir) {
+            if (isDir) {
+                loadFiles(path);
             }
         }
 
-        async function loadIncomingShares() {
-            document.getElementById('breadcrumb').textContent = 'Shared with Me';
-            document.getElementById('content-area').innerHTML = '<div class="loading">Loading...</div>';
+        // Context Menu
+        function showContextMenu(event, path, name, writable) {
+            event.preventDefault();
+            event.stopPropagation();
 
+            contextMenuItem = { path, name, writable };
+
+            const menu = document.getElementById('contextMenu');
+            menu.style.left = event.pageX + 'px';
+            menu.style.top = event.pageY + 'px';
+            menu.classList.add('show');
+        }
+
+        function handleContextAction(action) {
+            document.getElementById('contextMenu').classList.remove('show');
+
+            if (!contextMenuItem) return;
+
+            if (action === 'rename' && contextMenuItem.writable) {
+                showRenameModal(contextMenuItem.path, contextMenuItem.name);
+            } else if (action === 'share') {
+                showShareModal(contextMenuItem.path);
+            } else if (action === 'delete' && contextMenuItem.writable) {
+                deleteItem(contextMenuItem.path, contextMenuItem.name);
+            }
+        }
+
+        // Search
+        function handleSearchKeypress(event) {
+            if (event.key === 'Enter') {
+                performSearch();
+            }
+        }
+
+        async function performSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) return;
+
+            currentSearch = { query, root: currentPath };
+            currentView = 'search';
+            showLoading();
+
+            const result = await apiCall('/api/search', 'POST', {
+                path: currentPath,
+                query: query
+            });
+
+            if (result.success) {
+                renderSearchResults(result.items, query);
+            } else {
+                showError(result.error);
+            }
+        }
+
+        function renderSearchResults(items, query) {
+            let html = `
+                <div class="breadcrumb">
+                    <span class="material-icons" style="font-size: 20px; margin-right: 8px;">search</span>
+                    <span style="font-weight: 500;">Search results for "${escapeHtml(query)}"</span>
+                    <span style="color: #5f6368; margin-left: 8px;">(${items.length} items)</span>
+                </div>
+            `;
+
+            if (items.length === 0) {
+                html += `
+                    <div class="empty-state">
+                        <span class="material-icons">search_off</span>
+                        <h3>No results found</h3>
+                        <p>Try different keywords</p>
+                    </div>
+                `;
+                document.getElementById('contentArea').innerHTML = html;
+                return;
+            }
+
+            if (viewMode === 'grid') {
+                html += '<div class="file-grid">';
+                items.forEach(item => {
+                    const icon = item.is_dir ? 'folder' : getFileIcon(item.name);
+                    const iconClass = item.is_dir ? 'folder' : 'document';
+                    const modified = new Date(item.modified).toLocaleDateString();
+
+                    html += `
+                        <div class="file-card" onclick="handleFileClick('${escapeHtml(item.path)}', ${item.is_dir})">
+                            <div class="file-icon material-icons ${iconClass}">${icon}</div>
+                            <div class="file-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+                            <div class="file-meta">
+                                ${item.is_dir ? '' : formatBytes(item.size) + ' • '}${modified}
+                            </div>
+                            <div class="file-meta" style="color: #80868b; font-size: 11px;">
+                                ${escapeHtml(item.parent_path)}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            } else {
+                html += `
+                    <div class="file-list">
+                        <div class="file-list-header">
+                            <div>Name</div>
+                            <div>Location</div>
+                            <div>Modified</div>
+                            <div>Size</div>
+                        </div>
+                `;
+                items.forEach(item => {
+                    const icon = item.is_dir ? 'folder' : getFileIcon(item.name);
+                    const size = item.is_dir ? '-' : formatBytes(item.size);
+                    const modified = new Date(item.modified).toLocaleString();
+
+                    html += `
+                        <div class="file-list-item" onclick="handleFileClick('${escapeHtml(item.path)}', ${item.is_dir})">
+                            <div class="file-list-name">
+                                <span class="material-icons">${icon}</span>
+                                <span>${escapeHtml(item.name)}</span>
+                            </div>
+                            <div class="file-list-info">${escapeHtml(item.parent_path)}</div>
+                            <div class="file-list-info">${modified}</div>
+                            <div class="file-list-info">${size}</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            document.getElementById('contentArea').innerHTML = html;
+        }
+
+        // Shared Views
+        async function loadIncomingShares() {
+            showLoading();
             const result = await apiCall('/api/share/incoming');
 
             if (result.success) {
-                renderIncomingShares(result.shares);
+                renderSharedView(result.shares, 'incoming');
             } else {
-                showError('content-area', result.error);
+                showError(result.error);
             }
-        }
-
-        function renderIncomingShares(shares) {
-            if (shares.length === 0) {
-                document.getElementById('content-area').innerHTML =
-                    '<div class="empty-state">No items shared with you</div>';
-                return;
-            }
-
-            let html = `
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Item</th>
-                            <th>Shared By</th>
-                            <th>Permission</th>
-                            <th>Shared Date</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-
-            shares.forEach(share => {
-                const itemName = share.source_path.split('/').pop();
-                const permission = share.permission;
-                const permissionBadge = permission === 'view' ?
-                    '<span class="badge badge-view">View Only</span>' :
-                    '<span class="badge badge-edit">Can Edit</span>';
-                const date = new Date(share.created_at).toLocaleString();
-                const status = share.source_exists && share.link_exists ?
-                    '✅ Active' : '❌ Broken';
-                const onClick = share.link_exists ? `loadFiles('${share.target_path}')` : '';
-
-                html += `
-                    <tr ${onClick ? `onclick="${onClick}" style="cursor: pointer;"` : ''}>
-                        <td>${itemName}</td>
-                        <td>${share.shared_by}</td>
-                        <td>${permissionBadge}</td>
-                        <td>${date}</td>
-                        <td>${status}</td>
-                        <td>
-                            ${share.link_exists ? `<button onclick="event.stopPropagation(); loadFiles('${share.target_path}')">Open</button>` : ''}
-                        </td>
-                    </tr>
-                `;
-            });
-
-            html += '</tbody></table>';
-            document.getElementById('content-area').innerHTML = html;
         }
 
         async function loadOutgoingShares() {
-            document.getElementById('breadcrumb').textContent = 'Shared by Me';
-            document.getElementById('content-area').innerHTML = '<div class="loading">Loading...</div>';
-
+            showLoading();
             const result = await apiCall('/api/share/outgoing');
 
             if (result.success) {
-                renderOutgoingShares(result.shares);
+                renderSharedView(result.shares, 'outgoing');
             } else {
-                showError('content-area', result.error);
+                showError(result.error);
             }
         }
 
-        function renderOutgoingShares(shares) {
+        function renderSharedView(shares, type) {
+            const title = type === 'incoming' ? 'Shared with me' : 'Shared by me';
+            let html = `
+                <div class="breadcrumb">
+                    <span class="material-icons" style="font-size: 20px; margin-right: 8px;">
+                        ${type === 'incoming' ? 'people' : 'reply'}
+                    </span>
+                    <span style="font-weight: 500;">${title}</span>
+                    <span style="color: #5f6368; margin-left: 8px;">(${shares.length} items)</span>
+                </div>
+            `;
+
             if (shares.length === 0) {
-                document.getElementById('content-area').innerHTML =
-                    '<div class="empty-state">You haven\'t shared any items</div>';
+                html += `
+                    <div class="empty-state">
+                        <span class="material-icons">${type === 'incoming' ? 'people_outline' : 'reply'}</span>
+                        <h3>No shared items</h3>
+                        <p>${type === 'incoming' ? 'Items shared with you will appear here' : 'Items you share will appear here'}</p>
+                    </div>
+                `;
+                document.getElementById('contentArea').innerHTML = html;
                 return;
             }
 
-            let html = `
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Item</th>
-                            <th>Shared With</th>
-                            <th>Permission</th>
-                            <th>Shared Date</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-
             shares.forEach(share => {
-                const itemName = share.source_path.split('/').pop();
-                const permission = share.permission;
-                const permissionBadge = permission === 'view' ?
-                    '<span class="badge badge-view">View Only</span>' :
-                    '<span class="badge badge-edit">Can Edit</span>';
-                const date = new Date(share.created_at).toLocaleString();
-                const status = share.exists ? '✅ Active' : '❌ Source Deleted';
+                const isDir = share.is_dir || false;
+                const icon = isDir ? 'folder' : getFileIcon(share.path); // Corrected to use share.path
+                const permissionBadge = share.permission === 'view' ?
+                    '<span class="badge badge-view"><span class="material-icons" style="font-size: 11px;">visibility</span> View</span>' :
+                    '<span class="badge badge-edit"><span class="material-icons" style="font-size: 11px;">edit</span> Edit</span>';
+                const statusBadge = share.status === 'broken' ? '<span class="badge badge-broken">Broken</span>' : '';
+                const displayPath = type === 'incoming' ? share.target_path : share.source_path;
+                const fileName = displayPath ? displayPath.split('/').pop() : 'Unknown';
+                const otherUser = type === 'incoming' ? share.shared_by : share.shared_with;
+                const created = share.created_at ? new Date(share.created_at).toLocaleDateString() : '';
 
                 html += `
-                    <tr>
-                        <td>${itemName}</td>
-                        <td>${share.shared_with}</td>
-                        <td>${permissionBadge}</td>
-                        <td>${date}</td>
-                        <td>${status}</td>
-                        <td>
-                            <button onclick="revokeShare(${share.id})">Revoke</button>
-                        </td>
-                    </tr>
+                    <div class="share-list-item">
+                        <div class="share-info">
+                            <div class="share-icon">
+                                <span class="material-icons">${icon}</span>
+                            </div>
+                            <div class="share-details">
+                                <div class="share-name">${escapeHtml(fileName)}</div>
+                                <div class="share-path">
+                                    ${type === 'incoming' ? 'Shared by' : 'Shared with'}: <strong>${escapeHtml(otherUser)}</strong>
+                                    ${created ? ' • ' + created : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            ${permissionBadge}
+                            ${statusBadge}
+                            ${type === 'incoming' && share.target_path ?
+                                `<button class="btn btn-text" onclick="loadFiles('${escapeHtml(share.target_path)}')">Open</button>` :
+                                type === 'outgoing' ?
+                                `<button class="btn btn-text" onclick="revokeShare(${share.id})">Revoke</button>` :
+                                ''
+                            }
+                        </div>
+                    </div>
                 `;
             });
 
-            html += '</tbody></table>';
-            document.getElementById('content-area').innerHTML = html;
+            document.getElementById('contentArea').innerHTML = html;
         }
 
+        // Audit Log
         async function loadAuditLog() {
-            document.getElementById('breadcrumb').textContent = 'Activity Log';
-            document.getElementById('content-area').innerHTML = '<div class="loading">Loading...</div>';
-
+            showLoading();
             const result = await apiCall('/api/audit_log');
 
             if (result.success) {
                 renderAuditLog(result.logs);
             } else {
-                showError('content-area', result.error);
+                showError(result.error);
             }
         }
 
         function renderAuditLog(logs) {
+            let html = `
+                <div class="breadcrumb">
+                    <span class="material-icons" style="font-size: 20px; margin-right: 8px;">history</span>
+                    <span style="font-weight: 500;">Activity Log</span>
+                    <span style="color: #5f6368; margin-left: 8px;">(${logs.length} recent activities)</span>
+                </div>
+            `;
+
             if (logs.length === 0) {
-                document.getElementById('content-area').innerHTML =
-                    '<div class="empty-state">No activity recorded</div>';
+                html += `
+                    <div class="empty-state">
+                        <span class="material-icons">history</span>
+                        <h3>No activity yet</h3>
+                        <p>Your activity will appear here</p>
+                    </div>
+                `;
+                document.getElementById('contentArea').innerHTML = html;
                 return;
             }
 
-            let html = `
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Timestamp</th>
-                            <th>Action</th>
-                            <th>Target</th>
-                            <th>Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
+            html += '<div class="file-list"><div class="file-list-header"><div>Action</div><div>Target</div><div>Time</div><div>Details</div></div>';
 
             logs.forEach(log => {
                 const timestamp = new Date(log.timestamp).toLocaleString();
+                const actionIcon = getActionIcon(log.action);
+
                 html += `
-                    <tr>
-                        <td>${timestamp}</td>
-                        <td>${log.action}</td>
-                        <td>${log.target_path || '-'}</td>
-                        <td>${log.details || '-'}</td>
-                    </tr>
+                    <div class="file-list-item">
+                        <div class="file-list-name">
+                            <span class="material-icons">${actionIcon}</span>
+                            <span>${escapeHtml(log.action)}</span>
+                        </div>
+                        <div class="file-list-info">${escapeHtml(log.target_path || '-')}</div>
+                        <div class="file-list-info">${timestamp}</div>
+                        <div class="file-list-info">${escapeHtml(log.details || '-')}</div>
+                    </div>
                 `;
             });
 
-            html += '</tbody></table>';
-            document.getElementById('content-area').innerHTML = html;
+            html += '</div>';
+            document.getElementById('contentArea').innerHTML = html;
         }
 
-        // Modal operations
+        // Create Operations
         function showCreateFolderModal() {
-            document.getElementById('createFolderModal').style.display = 'block';
-            document.getElementById('folderName').value = '';
-            document.getElementById('createFolderError').style.display = 'none';
-        }
-
-        function showCreateFileModal() {
-            document.getElementById('createFileModal').style.display = 'block';
-            document.getElementById('fileName').value = '';
-            document.getElementById('createFileError').style.display = 'none';
-        }
-
-        function showRenameModal(path, currentName) {
-            selectedItem = path;
-            document.getElementById('renameModal').style.display = 'block';
-            document.getElementById('newName').value = currentName;
-            document.getElementById('renameError').style.display = 'none';
-        }
-
-        function showShareModal(path) {
-            selectedItem = path;
-            document.getElementById('shareModal').style.display = 'block';
-            document.getElementById('shareRecipient').value = '';
-            document.getElementById('sharePermission').value = 'view';
-            document.getElementById('shareError').style.display = 'none';
-            document.getElementById('shareSuccess').style.display = 'none';
-        }
-
-        function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
+            document.getElementById('folderNameInput').value = '';
+            document.getElementById('createFolderError').classList.remove('show');
+            document.getElementById('createFolderModal').classList.add('show');
+            setTimeout(() => document.getElementById('folderNameInput').focus(), 100);
         }
 
         async function createFolder() {
-            const folderName = document.getElementById('folderName').value.trim();
-            if (!folderName) {
+            const name = document.getElementById('folderNameInput').value.trim();
+            if (!name) {
                 showModalError('createFolderError', 'Please enter a folder name');
                 return;
             }
 
             const result = await apiCall('/api/create_folder', 'POST', {
                 parent_path: currentPath,
-                folder_name: folderName
+                folder_name: name
             });
 
             if (result.success) {
                 closeModal('createFolderModal');
-                loadFiles(currentPath);
+                refreshCurrentView();
             } else {
                 showModalError('createFolderError', result.error);
             }
         }
 
+        function showCreateFileModal() {
+            document.getElementById('fileNameInput').value = '';
+            document.getElementById('createFileError').classList.remove('show');
+            document.getElementById('createFileModal').classList.add('show');
+            setTimeout(() => document.getElementById('fileNameInput').focus(), 100);
+        }
+
         async function createFile() {
-            const fileName = document.getElementById('fileName').value.trim();
-            if (!fileName) {
+            const name = document.getElementById('fileNameInput').value.trim();
+            if (!name) {
                 showModalError('createFileError', 'Please enter a file name');
                 return;
             }
 
             const result = await apiCall('/api/create_file', 'POST', {
                 parent_path: currentPath,
-                file_name: fileName,
-                content: ''
+                file_name: name
             });
 
             if (result.success) {
                 closeModal('createFileModal');
-                loadFiles(currentPath);
+                refreshCurrentView();
             } else {
                 showModalError('createFileError', result.error);
             }
         }
 
+        // Rename
+        function showRenameModal(path, currentName) {
+            selectedItem = { path, name: currentName };
+            document.getElementById('newNameInput').value = currentName;
+            document.getElementById('renameError').classList.remove('show');
+            document.getElementById('renameModal').classList.add('show');
+            setTimeout(() => document.getElementById('newNameInput').select(), 100);
+        }
+
         async function performRename() {
-            const newName = document.getElementById('newName').value.trim();
+            if (!selectedItem) return;
+
+            const newName = document.getElementById('newNameInput').value.trim();
             if (!newName) {
                 showModalError('renameError', 'Please enter a new name');
                 return;
             }
 
             const result = await apiCall('/api/rename', 'POST', {
-                path: selectedItem,
+                path: selectedItem.path,
                 new_name: newName
             });
 
             if (result.success) {
                 closeModal('renameModal');
-                loadFiles(currentPath);
+                refreshCurrentView();
             } else {
                 showModalError('renameError', result.error);
             }
         }
 
+        // Delete
         async function deleteItem(path, name) {
-            if (!confirm(`Are you sure you want to delete "${name}"?`)) {
-                return;
-            }
+            if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
 
             const result = await apiCall('/api/delete', 'POST', { path: path });
 
             if (result.success) {
-                loadFiles(currentPath);
+                refreshCurrentView();
             } else {
                 alert('Error: ' + result.error);
             }
         }
 
+        // Share
+        function showShareModal(path) {
+            selectedItem = { path };
+            document.getElementById('shareRecipientSelect').value = '';
+            document.getElementById('sharePermissionSelect').value = 'view';
+            document.getElementById('shareError').classList.remove('show');
+            document.getElementById('shareSuccess').classList.remove('show');
+            document.getElementById('shareModal').classList.add('show');
+        }
+
+        async function loadUsers() {
+            const result = await apiCall('/api/users');
+            if (result.success) {
+                const select = document.getElementById('shareRecipientSelect');
+                select.innerHTML = '<option value="">Select a user...</option>';
+                result.users.forEach(user => {
+                    select.innerHTML += `<option value="${escapeHtml(user.username)}">${escapeHtml(user.username)} - ${escapeHtml(user.fullname)}</option>`;
+                });
+            }
+        }
+
         async function performShare() {
-            const recipient = document.getElementById('shareRecipient').value;
-            const permission = document.getElementById('sharePermission').value;
+            if (!selectedItem) return;
+
+            const recipient = document.getElementById('shareRecipientSelect').value;
+            const permission = document.getElementById('sharePermissionSelect').value;
 
             if (!recipient) {
                 showModalError('shareError', 'Please select a user');
@@ -970,192 +1655,119 @@
             }
 
             const result = await apiCall('/api/share/create', 'POST', {
-                source_path: selectedItem,
+                source_path: selectedItem.path,
                 recipient: recipient,
                 permission: permission
             });
 
             if (result.success) {
-                document.getElementById('shareError').style.display = 'none';
-                document.getElementById('shareSuccess').textContent = 'Share created successfully!';
-                document.getElementById('shareSuccess').style.display = 'block';
-                setTimeout(() => {
-                    closeModal('shareModal');
-                }, 1500);
+                showModalSuccess('shareSuccess', 'Shared successfully!');
+                setTimeout(() => closeModal('shareModal'), 1500);
             } else {
                 showModalError('shareError', result.error);
             }
         }
 
         async function revokeShare(shareId) {
-            if (!confirm('Are you sure you want to revoke this share?')) {
-                return;
-            }
+            if (!confirm('Are you sure you want to revoke this share?')) return;
 
             const result = await apiCall('/api/share/revoke', 'POST', { share_id: shareId });
 
             if (result.success) {
-                loadOutgoingShares();
+                refreshCurrentView();
             } else {
                 alert('Error: ' + result.error);
             }
         }
 
-        // Search operations
-        function setupSearchInput() {
-            const searchInput = document.getElementById('searchInput');
-            searchInput.addEventListener('keydown', function(event) {
-                if (event.key === 'Enter') {
-                    performSearch();
-                }
-            });
+        // Modals
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
         }
 
-        function performSearch() {
-            const query = document.getElementById('searchInput').value.trim();
-            if (!query) {
-                // Empty query returns to current folder view
-                currentView = 'files';
-                loadFiles(currentPath);
-                return;
-            }
-            searchFiles(currentPath, query);
-        }
-
-        async function searchFiles(rootPath, query) {
-            currentView = 'search';
-            currentSearch = { query, root: rootPath };
-            document.getElementById('breadcrumb').textContent = `Search "${query}" under ${rootPath}`;
-            document.getElementById('content-area').innerHTML = '<div class="loading">Searching...</div>';
-
-            const result = await apiCall('/api/search', 'POST', {
-                path: rootPath,
-                query: query
-            });
-
-            if (result.success) {
-                renderSearchResults(result.items, query, rootPath);
-            } else {
-                showError('content-area', result.error);
+        function handleModalKeypress(event, action) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                window[action]();
             }
         }
 
-        function renderSearchResults(items, query, rootPath) {
-            if (!items || items.length === 0) {
-                document.getElementById('content-area').innerHTML =
-                    `<div class="empty-state">No matches for "${query}" under ${rootPath}</div>`;
-                return;
-            }
-
-            let html = `
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Location</th>
-                            <th>Type</th>
-                            <th>Modified</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+        // UI Helpers
+        function showLoading() {
+            document.getElementById('contentArea').innerHTML = `
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <div>Loading...</div>
+                </div>
             `;
-
-            items.forEach(item => {
-                const typeLabel = item.is_dir ? 'Folder' : (item.is_link ? 'Symlink' : 'File');
-                const modified = new Date(item.modified).toLocaleString();
-                const openPath = item.is_dir ? item.path : item.parent_path || rootPath;
-                const openActionLabel = item.is_dir ? 'Open' : 'Open Location';
-
-                html += `
-                    <tr>
-                        <td>${item.name}${item.is_link ? ' 🔗' : ''}</td>
-                        <td>${item.parent_path || '-'}</td>
-                        <td>${typeLabel}</td>
-                        <td>${modified}</td>
-                        <td>
-                            <button onclick="loadFiles('${openPath}', { pushHistory: true })">${openActionLabel}</button>
-                        </td>
-                    </tr>
-                `;
-            });
-
-            html += '</tbody></table>';
-            document.getElementById('content-area').innerHTML = html;
         }
 
-        // Path bar helpers
-        function setupPathInput() {
-            const input = document.getElementById('pathInput');
-            input.addEventListener('keydown', function(event) {
-                if (event.key === 'Enter') {
-                    goToPathFromInput();
-                }
-            });
-            updatePathUI();
+        function showError(message) {
+            document.getElementById('contentArea').innerHTML = `
+                <div class="empty-state">
+                    <span class="material-icons" style="color: #ea4335;">error_outline</span>
+                    <h3>Error</h3>
+                    <p>${escapeHtml(message)}</p>
+                </div>
+            `;
         }
 
-        function updatePathUI() {
-            const breadcrumb = document.getElementById('breadcrumb');
-            const input = document.getElementById('pathInput');
-            const backButton = document.getElementById('backButton');
-            if (breadcrumb) {
-                breadcrumb.textContent = currentPath;
-            }
-            if (input) {
-                input.value = currentPath;
-            }
-            if (backButton) {
-                backButton.disabled = pathHistory.length === 0;
-            }
+        function showModalError(elementId, message) {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.classList.add('show');
         }
 
-        function goBack() {
-            if (pathHistory.length === 0) return;
-            const previous = pathHistory.pop();
-            loadFiles(previous, { pushHistory: false });
+        function showModalSuccess(elementId, message) {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.classList.add('show');
         }
 
-        function goToPathFromInput() {
-            const target = document.getElementById('pathInput').value.trim();
-            if (!target || target === currentPath) return;
-            loadFiles(target);
-        }
-
-        function copyCurrentPath() {
-            if (!navigator.clipboard) {
-                alert('Clipboard not available in this browser.');
-                return;
-            }
-            navigator.clipboard.writeText(currentPath)
-                .catch(() => alert('Unable to copy path.'));
-        }
-
-        // Utility functions
+        // Utilities
         function formatBytes(bytes) {
             if (bytes === 0) return '0 B';
             const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const sizes = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
         }
 
-        function showError(containerId, message) {
-            document.getElementById(containerId).innerHTML =
-                `<div class="error" style="display: block;">${message}</div>`;
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
-        function showModalError(errorId, message) {
-            const errorEl = document.getElementById(errorId);
-            errorEl.textContent = message;
-            errorEl.style.display = 'block';
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const iconMap = {
+                'pdf': 'picture_as_pdf',
+                'doc': 'description', 'docx': 'description',
+                'xls': 'table_chart', 'xlsx': 'table_chart',
+                'ppt': 'slideshow', 'pptx': 'slideshow',
+                'jpg': 'image', 'jpeg': 'image', 'png': 'image', 'gif': 'image',
+                'mp4': 'movie', 'avi': 'movie', 'mov': 'movie',
+                'mp3': 'audio_file', 'wav': 'audio_file',
+                'zip': 'folder_zip', 'rar': 'folder_zip', 'tar': 'folder_zip',
+                'txt': 'description',
+                'py': 'code', 'js': 'code', 'html': 'code', 'css': 'code',
+            };
+            return iconMap[ext] || 'insert_drive_file';
         }
 
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            if (event.target.classList.contains('modal')) {
-                event.target.style.display = 'none';
-            }
+        function getActionIcon(action) {
+            const iconMap = {
+                'CREATE_FOLDER': 'create_new_folder',
+                'CREATE_FILE': 'insert_drive_file',
+                'RENAME': 'edit',
+                'DELETE': 'delete',
+                'MOVE': 'drive_file_move',
+                'SHARE': 'share',
+                'REVOKE': 'block',
+            };
+            return iconMap[action] || 'info';
         }
     </script>
 </body>
